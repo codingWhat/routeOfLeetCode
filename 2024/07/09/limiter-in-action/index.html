@@ -16,15 +16,15 @@
   <meta name="author" content="codingWhat">
   <meta name="keywords" content="evanhan codingWhat 博客 韩伟的博客 系统设计 后端开发">
   
-    <meta name="description" content="codingWhat Blog">
+    <meta name="description" content="作为服务提供者不可能准确预测外部流量，为了应对这种复杂动态的流量冲击，限流在服务可用性治理中扮演着重要的角色，为服务的稳定性保家护航。">
 <meta property="og:type" content="article">
 <meta property="og:title" content="单机限流实战">
 <meta property="og:url" content="http://codingwhat.github.io/2024/07/09/limiter-in-action/index.html">
 <meta property="og:site_name" content="codingWhat Blog">
-<meta property="og:description" content="codingWhat Blog">
+<meta property="og:description" content="作为服务提供者不可能准确预测外部流量，为了应对这种复杂动态的流量冲击，限流在服务可用性治理中扮演着重要的角色，为服务的稳定性保家护航。">
 <meta property="og:locale" content="zh_CN">
 <meta property="article:published_time" content="2024-07-09T09:42:14.000Z">
-<meta property="article:modified_time" content="2024-07-09T09:42:30.361Z">
+<meta property="article:modified_time" content="2024-07-09T09:55:13.955Z">
 <meta property="article:author" content="codingWhat">
 <meta property="article:tag" content="evanhan codingWhat 博客 韩伟的博客 系统设计 后端开发">
 <meta name="twitter:card" content="summary_large_image">
@@ -249,7 +249,7 @@
       <span class="post-meta mr-2">
         <i class="iconfont icon-chart"></i>
         
-          0 字
+          187 字
         
       </span>
     
@@ -260,7 +260,7 @@
         
         
         
-          1 分钟
+          2 分钟
         
       </span>
     
@@ -310,7 +310,21 @@
             
               <div class="markdown-body">
                 
-                
+                <blockquote>
+<p>作为服务提供者不可能准确预测外部流量，为了应对这种复杂动态的流量冲击，限流在服务可用性治理中扮演着重要的角色，为服务的稳定性保家护航。</p>
+</blockquote>
+<span id="more"></span>
+
+<h2 id="单机限流分两种类型"><a href="#单机限流分两种类型" class="headerlink" title="单机限流分两种类型:"></a>单机限流分两种类型:</h2><h3 id="静态限流"><a href="#静态限流" class="headerlink" title="静态限流"></a>静态限流</h3><ol>
+<li>令牌桶</li>
+<li>漏桶</li>
+<li>固定窗口</li>
+<li>滑动窗口</li>
+</ol>
+<h3 id="动态限流"><a href="#动态限流" class="headerlink" title="动态限流:"></a>动态限流:</h3><ol>
+<li>类BBR,自适应限流</li>
+</ol>
+<h2 id="代码实现"><a href="#代码实现" class="headerlink" title="代码实现"></a>代码实现</h2><h3 id="令牌桶"><a href="#令牌桶" class="headerlink" title="令牌桶"></a>令牌桶</h3><figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-keyword">type</span> TokenBucket <span class="hljs-keyword">struct</span> &#123;<br>    Rate <span class="hljs-type">float64</span><br>	Token    <span class="hljs-type">float64</span> <span class="hljs-comment">//当前存在的token</span><br>	Capacity <span class="hljs-type">float64</span><br>	lastRefill time.Time<br><br>	sync.Mutex<br>&#125;<br><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">NewTokenBucket</span><span class="hljs-params">(rate <span class="hljs-type">float64</span>, capacity <span class="hljs-type">float64</span>)</span></span> *TokenBucket &#123;<br>     <span class="hljs-keyword">return</span> &amp;TokenBucket&#123;Rate: rate, Capacity: capacity, Token: capacity, lastRefill: time.Now()&#125;<br>&#125;<br>    <br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(tb *TokenBucket)</span></span> Allow() <span class="hljs-type">bool</span> &#123;<br>    tb.Lock()<br>    <span class="hljs-keyword">defer</span> tb.Unlock()<br>    now := time.Now()<br>    elapsed := now.Sub(tb.lastRefill).Seconds()<br>    tb.Token += elapsed * tb.Rate<br>    <span class="hljs-keyword">if</span> tb.Token &gt; tb.Capacity &#123;<br>    tb.Token = tb.Capacity<br>    &#125;<br><br>    <span class="hljs-keyword">if</span> tb.Token &gt;= <span class="hljs-number">1.0</span> &#123;<br>        tb.Token--<br>        tb.lastRefill = now<br>        <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span><br>    &#125;<br><br>    <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span><br>&#125;<br></code></pre></td></tr></table></figure>
                 
               </div>
             
