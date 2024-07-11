@@ -25,7 +25,7 @@
 <meta property="og:locale" content="zh_CN">
 <meta property="og:image" content="http://codingwhat.github.io/images/wireshark_502.png">
 <meta property="article:published_time" content="2024-07-09T08:35:08.000Z">
-<meta property="article:modified_time" content="2024-07-11T09:59:47.000Z">
+<meta property="article:modified_time" content="2024-07-11T10:00:40.184Z">
 <meta property="article:author" content="codingWhat">
 <meta property="article:tag" content="Go">
 <meta property="article:tag" content="Nginx">
@@ -357,7 +357,7 @@
 <ol>
 <li>listen backlog用了默认长度511, listen backlog是长连接队列长度，如果长度过短，容易打满拒绝请求，将backlog长度调大，能进一步提升吞吐。</li>
 </ol>
-<h3 id="问题3-优雅清理nginx日志"><a href="#问题3-优雅清理nginx日志" class="headerlink" title="问题3: 优雅清理nginx日志"></a>问题3: 优雅清理nginx日志</h3><p>通过keepalive配置，502问题确实明显改善了，但是突然过了几天，又偶现了502问题，在排查基础资源监控时发现502的时间点，恰好有磁盘和内存空间骤降；<br>这里定位是因为反向代理的nginx会记录access日志，而我们的服务流量很高access日志容易写满，需要定时清理，清理逻辑：</p>
+<h3 id="问题3-暴力清理nginx日志"><a href="#问题3-暴力清理nginx日志" class="headerlink" title="问题3: 暴力清理nginx日志"></a>问题3: 暴力清理nginx日志</h3><p>通过keepalive配置，502问题确实明显改善了，但是突然过了几天，又偶现了502问题，在排查基础资源监控时发现502的时间点，恰好有磁盘和内存空间骤降；<br>这里定位是因为反向代理的nginx会记录access日志，而我们的服务流量很高access日志容易写满，需要定时清理，清理逻辑：</p>
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><code class="hljs bash"><span class="hljs-comment"># crontab</span><br><span class="hljs-built_in">echo</span> &gt; /path/access.log<br></code></pre></td></tr></table></figure>
 <p>这里有个背景说明下:<br>access文件是会被采集程序访问上报到日志平台。上述直接”echo &gt; “ 是可能会导致os.Cache中日志被清理,可能采集程序就会采集不到，出现异常。</p>
 <p>改造逻辑: </p>
