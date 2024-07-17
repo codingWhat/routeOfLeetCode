@@ -16,25 +16,22 @@
   <meta name="author" content="codingWhat">
   <meta name="keywords" content="evanhan codingWhat 博客 韩伟的博客 系统设计 后端开发">
   
-    <meta name="description" content="作为服务提供者即便可以做不同规模的容量模型，但是面对未知的外部流量不可能做到准确预测的，为了应对海量流量的冲击，服务必须得采取自保护策略，丢弃掉部分流量来保障服务的稳定性。">
+    <meta name="description" content="业务场景中经常会有缓存的身影，虽然缓存给我们带来了诸多好处，但是缓存带来的问题却不容小觑，常见的有缓存雪崩、缓存穿透、缓存击穿。今天来说说缓存击穿及其解决方案。 问题场景当发生缓存击穿时，瞬时流量会涌入下游服务或者存储造成极大的冲击甚至打挂，此时业务应该如何应对？">
 <meta property="og:type" content="article">
-<meta property="og:title" content="单机限流实战">
-<meta property="og:url" content="http://codingwhat.github.io/2024/07/09/limiter-in-action/index.html">
+<meta property="og:title" content="Single-flight 核心逻辑拆解">
+<meta property="og:url" content="http://codingwhat.github.io/2024/07/17/single-flight-analysis/index.html">
 <meta property="og:site_name" content="codingWhat Blog">
-<meta property="og:description" content="作为服务提供者即便可以做不同规模的容量模型，但是面对未知的外部流量不可能做到准确预测的，为了应对海量流量的冲击，服务必须得采取自保护策略，丢弃掉部分流量来保障服务的稳定性。">
+<meta property="og:description" content="业务场景中经常会有缓存的身影，虽然缓存给我们带来了诸多好处，但是缓存带来的问题却不容小觑，常见的有缓存雪崩、缓存穿透、缓存击穿。今天来说说缓存击穿及其解决方案。 问题场景当发生缓存击穿时，瞬时流量会涌入下游服务或者存储造成极大的冲击甚至打挂，此时业务应该如何应对？">
 <meta property="og:locale" content="zh_CN">
-<meta property="article:published_time" content="2024-07-09T09:42:14.000Z">
-<meta property="article:modified_time" content="2024-07-12T03:37:13.182Z">
+<meta property="article:published_time" content="2024-07-17T08:19:03.000Z">
+<meta property="article:modified_time" content="2024-07-17T08:38:59.506Z">
 <meta property="article:author" content="codingWhat">
-<meta property="article:tag" content="GO">
-<meta property="article:tag" content="可用性治理">
-<meta property="article:tag" content="限流">
-<meta property="article:tag" content="单机限流">
+<meta property="article:tag" content="evanhan codingWhat 博客 韩伟的博客 系统设计 后端开发">
 <meta name="twitter:card" content="summary_large_image">
   
   
   
-  <title>单机限流实战 - codingWhat Blog</title>
+  <title>Single-flight 核心逻辑拆解 - codingWhat Blog</title>
 
   <link  rel="stylesheet" href="https://lib.baomitu.com/twitter-bootstrap/4.6.1/css/bootstrap.min.css" />
 
@@ -229,7 +226,7 @@
       <div class="banner-text text-center fade-in-up">
         <div class="h2">
           
-            <span id="subtitle" data-typed-text="单机限流实战"></span>
+            <span id="subtitle" data-typed-text="Single-flight 核心逻辑拆解"></span>
           
         </div>
 
@@ -240,8 +237,8 @@
     
       <span class="post-meta">
         <i class="iconfont icon-date-fill" aria-hidden="true"></i>
-        <time datetime="2024-07-09 17:42" pubdate>
-          2024年7月9日 下午
+        <time datetime="2024-07-17 16:19" pubdate>
+          2024年7月17日 下午
         </time>
       </span>
     
@@ -252,7 +249,7 @@
       <span class="post-meta mr-2">
         <i class="iconfont icon-chart"></i>
         
-          773 字
+          727 字
         
       </span>
     
@@ -308,40 +305,32 @@
       <div class="container nopadding-x-md" id="board-ctn">
         <div id="board">
           <article class="post-content mx-auto">
-            <h1 id="seo-header">单机限流实战</h1>
+            <h1 id="seo-header">Single-flight 核心逻辑拆解</h1>
             
             
               <div class="markdown-body">
                 
-                <blockquote>
-<p>作为服务提供者即便可以做不同规模的容量模型，但是面对未知的外部流量不可能做到准确预测的，为了应对海量流量的冲击，服务必须得采取自保护策略，丢弃掉部分流量来保障服务的稳定性。</p>
-</blockquote>
+                <p>业务场景中经常会有缓存的身影，虽然缓存给我们带来了诸多好处，但是缓存带来的问题却不容小觑，常见的有缓存雪崩、缓存穿透、缓存击穿。<br>今天来说说缓存击穿及其解决方案。</p>
+<h2 id="问题场景"><a href="#问题场景" class="headerlink" title="问题场景"></a>问题场景</h2><p>当发生缓存击穿时，瞬时流量会涌入下游服务或者存储造成极大的冲击甚至打挂，此时业务应该如何应对？</p>
 <span id="more"></span>
-
-<h1 id="在服务可用性治理中，过载保护分静态和动态限流两种手段。"><a href="#在服务可用性治理中，过载保护分静态和动态限流两种手段。" class="headerlink" title="在服务可用性治理中，过载保护分静态和动态限流两种手段。"></a>在服务可用性治理中，过载保护分静态和动态限流两种手段。</h1><h2 id="单机限流分两种类型"><a href="#单机限流分两种类型" class="headerlink" title="单机限流分两种类型:"></a>单机限流分两种类型:</h2><h3 id="静态限流"><a href="#静态限流" class="headerlink" title="静态限流"></a>静态限流</h3><ol>
-<li>令牌桶, 支持短时间瞬时流量</li>
-<li>漏桶, 匀速限流</li>
-<li>固定窗口, 存在边界问题</li>
-<li>滑动窗口, 精度高，但是内存占用高</li>
-</ol>
-<h4 id="共性"><a href="#共性" class="headerlink" title="共性:"></a>共性:</h4><ul>
-<li>优点: 实现简单,性能高</li>
-<li>缺点: 都是基于QPS限流静态限流阈值，无法根据服务的负载动态限流。</li>
-</ul>
-<h3 id="动态限流"><a href="#动态限流" class="headerlink" title="动态限流:"></a>动态限流:</h3><ol>
-<li>类BBR</li>
-</ol>
-<ul>
-<li>优点: 服务自适应限流限流</li>
-<li>缺点: 实现复杂</li>
-</ul>
-<h2 id="代码实现"><a href="#代码实现" class="headerlink" title="代码实现"></a>代码实现</h2><h3 id="令牌桶-核心逻辑源自标准库的rate包"><a href="#令牌桶-核心逻辑源自标准库的rate包" class="headerlink" title="令牌桶, 核心逻辑源自标准库的rate包"></a>令牌桶, 核心逻辑源自标准库的rate包</h3><figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-keyword">type</span> TokenBucket <span class="hljs-keyword">struct</span> &#123;<br>	rate       <span class="hljs-type">float64</span>    <span class="hljs-comment">// 令牌添加到桶中的速率。</span><br>	burst      <span class="hljs-type">int</span>        <span class="hljs-comment">// 桶的最大容量。</span><br>	tokens     <span class="hljs-type">float64</span>    <span class="hljs-comment">// 当前桶中的令牌数量。</span><br>	lastUpdate time.Time  <span class="hljs-comment">// 上次更新令牌数量的时间。</span><br>	mu         sync.Mutex <span class="hljs-comment">// 互斥锁，确保线程安全。</span><br>&#125;<br><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(tb *TokenBucket)</span></span> tokensFromDuration(d time.Duration) <span class="hljs-type">float64</span> &#123;<br>	<span class="hljs-comment">// Split the integer and fractional parts ourself to minimize rounding errors.</span><br>	<span class="hljs-comment">// See golang.org/issues/34861.</span><br>	sec := <span class="hljs-type">float64</span>(d/time.Second) * tb.rate<br>	nsec := <span class="hljs-type">float64</span>(d%time.Second) * tb.rate<br>	<span class="hljs-keyword">return</span> sec + nsec/<span class="hljs-number">1e9</span><br>&#125;<br><br><span class="hljs-comment">// NewTokenBucket 创建一个新的令牌桶，给定令牌添加速率和桶的容量。</span><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">NewTokenBucket</span><span class="hljs-params">(rate <span class="hljs-type">float64</span>, b <span class="hljs-type">int</span>)</span></span> *TokenBucket &#123;<br>	<span class="hljs-keyword">return</span> &amp;TokenBucket&#123;<br>		rate:   rate,<br>		burst:  b,<br>		tokens: <span class="hljs-number">0</span>,<br>	&#125;<br>&#125;<br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(tb *TokenBucket)</span></span> durationFromTokens(tokens <span class="hljs-type">float64</span>) time.Duration &#123;<br>	seconds := tokens / tb.rate<br>	<span class="hljs-keyword">return</span> time.Nanosecond * time.Duration(<span class="hljs-number">1e9</span>*seconds)<br>&#125;<br><br><span class="hljs-comment">// Allow 检查是否可以从桶中取出一个令牌。如果可以，它取出一个令牌并返回 true。</span><br><span class="hljs-comment">// 如果不可以，它返回 false。</span><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(tb *TokenBucket)</span></span> Allow() <span class="hljs-type">bool</span> &#123;<br>	tb.mu.Lock()<br>	<span class="hljs-keyword">defer</span> tb.mu.Unlock()<br><br>	now := time.Now()<br>	<span class="hljs-comment">// 计算（可生成令牌数)所需要的时间，burst令牌桶容量，tokens: 当前存在的令牌个数</span><br>	maxElapsed := tb.durationFromTokens(<span class="hljs-type">float64</span>(tb.burst) - tb.tokens)<br>	elapsed := now.Sub(tb.lastUpdate)<br>	<span class="hljs-keyword">if</span> elapsed &gt; maxElapsed &#123;<br>		elapsed = maxElapsed<br>	&#125;<br><br>	<span class="hljs-comment">// 计算生成的令牌</span><br>	delta := tb.tokensFromDuration(elapsed)<br>	tokens := tb.tokens + delta<br>	<span class="hljs-keyword">if</span> burst := <span class="hljs-type">float64</span>(tb.burst); tokens &gt; burst &#123;<br>		tokens = burst<br>	&#125;<br>	tokens--<br>	<span class="hljs-keyword">var</span> waitDuration time.Duration<br>	<span class="hljs-keyword">if</span> tokens &lt; <span class="hljs-number">0</span> &#123;<br>		<span class="hljs-comment">//说明取不到1个token, 那就计算取到1个token所需要的等待时间</span><br>		waitDuration = tb.durationFromTokens(-tokens)<br>	&#125;<br>	ok := <span class="hljs-number">1</span> &lt;= tb.burst &amp;&amp; waitDuration &lt;= <span class="hljs-number">0</span><br>	<span class="hljs-keyword">if</span> ok &#123;<br>		tb.lastUpdate = now<br>		tb.tokens = tokens<br>	&#125;<br>	<span class="hljs-keyword">return</span> ok<br>&#125;<br><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">main</span><span class="hljs-params">()</span></span> &#123;<br>	tokenBucket := NewTokenBucket(<span class="hljs-number">2.0</span>, <span class="hljs-number">1.0</span>)<br><br>    succ := <span class="hljs-number">0</span><br>	reject := <span class="hljs-number">0</span><br>	<span class="hljs-keyword">for</span> i := <span class="hljs-number">1</span>; i &lt;= <span class="hljs-number">30</span>; i++ &#123;<br>		now := time.Now().Format(<span class="hljs-string">&quot;15:04:05&quot;</span>)<br>		<span class="hljs-keyword">if</span> tokenBucket.Allow() &#123;<br>			succ++<br>			<span class="hljs-comment">//fmt.Printf(now+&quot;  第 %d 个请求通过\n&quot;, i)</span><br>		&#125; <span class="hljs-keyword">else</span> &#123; <span class="hljs-comment">// 如果不能移除一个令牌，请求被拒绝。</span><br>			reject++<br>			<span class="hljs-comment">//fmt.Printf(now+&quot;  第 %d 个请求被限流\n&quot;, i)</span><br>		&#125;<br>		time.Sleep(<span class="hljs-number">100</span> * time.Millisecond) <br>	&#125;<br>	fmt.Println(succ, <span class="hljs-string">&quot;===&gt;&quot;</span>, reject)<br>&#125;<br></code></pre></td></tr></table></figure>
-<p>注意:</p>
+<h2 id="解决方案"><a href="#解决方案" class="headerlink" title="解决方案:"></a>解决方案:</h2><p>singleflight, 主要解决了:</p>
 <ol>
-<li>在测试限流时，要设置合理的sleep时间，才能看出限流效果。<br>假设rate:1000(1s&#x2F;1000 -&gt; 1ms&#x2F;1), 想要模拟成功和拒绝是1:1，那就在sleep:500*time.Microsecond</li>
-<li>随着你测的rate越来越高，可能会发现success&#x2F;reject开始不精准，这是因为time.Sleep休眠时间不精确导致的，所以不用担心，<br>Sleep精准问题有兴趣可以看看<a target="_blank" rel="noopener" href="https://colobu.com/2023/12/07/more-precise-sleep/">这篇文章</a></li>
+<li>流量合并，将N个请求-&gt;1个请求</li>
+<li>流量拦截，如果发现已经有inflight请求，会阻塞等待inflight请求返回结果</li>
 </ol>
-
+<h3 id="核心逻辑"><a href="#核心逻辑" class="headerlink" title="核心逻辑"></a>核心逻辑</h3><ul>
+<li><p>抽象同类请求，利用wg去控制阻塞</p>
+<figure class="highlight gauss"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><code class="hljs gauss"><span class="hljs-built_in">type</span> <span class="hljs-keyword">call</span> <span class="hljs-keyword">struct</span> &#123;<br>	wg sync.WaitGroup <span class="hljs-comment">//利用其Wait 阻塞请求</span><br><br>	val interface&#123;&#125; <span class="hljs-comment">// 返回结果，被阻塞请求需要</span><br><br>    <span class="hljs-meta">## 省略非核心字段</span><br>&#125;<br><br></code></pre></td></tr></table></figure></li>
+<li><p>保存全局瞬时请求</p>
+<figure class="highlight gauss"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><code class="hljs gauss"><span class="hljs-built_in">type</span> Group <span class="hljs-keyword">struct</span> &#123;<br>	mu sync.Mutex       <span class="hljs-comment">// protects m</span><br>	m  map[<span class="hljs-keyword">string</span>]*<span class="hljs-keyword">call</span> <span class="hljs-comment">// 保存全局请求，lazily initialized</span><br>&#125;<br></code></pre></td></tr></table></figure>
+</li>
+<li><p>核心函数Do</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(g *Group)</span></span> Do(key <span class="hljs-type">string</span>, fn <span class="hljs-function"><span class="hljs-keyword">func</span><span class="hljs-params">()</span></span> (<span class="hljs-keyword">interface</span>&#123;&#125;, <span class="hljs-type">error</span>)) (v <span class="hljs-keyword">interface</span>&#123;&#125;, err <span class="hljs-type">error</span>, shared <span class="hljs-type">bool</span>) &#123;<br>	g.mu.Lock()<br>	<span class="hljs-keyword">if</span> g.m == <span class="hljs-literal">nil</span> &#123;<br>		g.m = <span class="hljs-built_in">make</span>(<span class="hljs-keyword">map</span>[<span class="hljs-type">string</span>]*call)<br>	&#125;<br>	<span class="hljs-keyword">if</span> c, ok := g.m[key]; ok &#123;<br>		c.dups++<br>		g.mu.Unlock()<br>		## 一旦发现有请求，就在这阻塞，注意使用了wg<br>		c.wg.Wait()<br><br>		#<span class="hljs-keyword">if</span> e, ok := c.err.(*panicError); ok &#123;<br>		#	<span class="hljs-built_in">panic</span>(e)<br>		#&#125; <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> c.err == errGoexit &#123;<br>		#	runtime.Goexit()<br>		#&#125;<br>		<span class="hljs-keyword">return</span> c.val, c.err, <span class="hljs-literal">true</span><br>	&#125;<br>	c := <span class="hljs-built_in">new</span>(call)<br>	c.wg.Add(<span class="hljs-number">1</span>)<br>	g.m[key] = c<br>	g.mu.Unlock()<br><br>	g.doCall(c, key, fn)<br>	<span class="hljs-keyword">return</span> c.val, c.err, c.dups &gt; <span class="hljs-number">0</span><br>&#125;<br><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(g *Group)</span></span> doCall(c *call, key <span class="hljs-type">string</span>, fn <span class="hljs-function"><span class="hljs-keyword">func</span><span class="hljs-params">()</span></span> (<span class="hljs-keyword">interface</span>&#123;&#125;, <span class="hljs-type">error</span>)) &#123;<br>	<span class="hljs-comment">// use double-defer to distinguish panic from runtime.Goexit,</span><br>	<span class="hljs-comment">// more details see https://golang.org/cl/134395</span><br>	<span class="hljs-keyword">defer</span> <span class="hljs-function"><span class="hljs-keyword">func</span><span class="hljs-params">()</span></span> &#123;<br>		<span class="hljs-comment">// the given function invoked runtime.Goexit</span><br>		<span class="hljs-keyword">if</span> !normalReturn &amp;&amp; !recovered &#123;<br>			c.err = errGoexit<br>		&#125;<br><br>		g.mu.Lock()<br>		<span class="hljs-keyword">defer</span> g.mu.Unlock()<br>		c.wg.Done()<br>		<span class="hljs-keyword">if</span> g.m[key] == c &#123;<br>			<span class="hljs-built_in">delete</span>(g.m, key)<br>		&#125;<br>        .... 省略<span class="hljs-built_in">panic</span>/channel相关处理<br>	&#125;()<br>    .... 省略非核心代码<br>		c.val, c.err = fn()<br>    ...  省略非核心代码<br><br>	<span class="hljs-keyword">if</span> !normalReturn &#123;<br>		recovered = <span class="hljs-literal">true</span><br>	&#125;<br>&#125;<br></code></pre></td></tr></table></figure></li>
+</ul>
+<h3 id="自己动手实践"><a href="#自己动手实践" class="headerlink" title="自己动手实践"></a>自己动手实践</h3><p>实践的目的是为了理解singleflight的思想，因此在实践过程中简化了代码设计、省去了非必要的异常处理，直接用全局变量去实现。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-keyword">package</span> main<br><br><span class="hljs-keyword">import</span> (<br>	<span class="hljs-string">&quot;fmt&quot;</span><br>	<span class="hljs-string">&quot;sync&quot;</span><br>	<span class="hljs-string">&quot;sync/atomic&quot;</span><br>	<span class="hljs-string">&quot;time&quot;</span><br>)<br><br><span class="hljs-keyword">type</span> HandleFn <span class="hljs-function"><span class="hljs-keyword">func</span><span class="hljs-params">()</span></span> (<span class="hljs-keyword">interface</span>&#123;&#125;, <span class="hljs-type">error</span>)<br><br><span class="hljs-keyword">type</span> call <span class="hljs-keyword">struct</span> &#123;<br>	sync.WaitGroup<br>	val <span class="hljs-keyword">interface</span>&#123;&#125;<br>	err <span class="hljs-type">error</span><br>&#125;<br><br><span class="hljs-keyword">var</span> (<br>	groups = <span class="hljs-built_in">make</span>(<span class="hljs-keyword">map</span>[<span class="hljs-type">string</span>]*call)<br>	mu     sync.RWMutex<br>)<br><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">main</span><span class="hljs-params">()</span></span> &#123;<br>	<span class="hljs-keyword">var</span> wg sync.WaitGroup<br>	num := <span class="hljs-number">5</span><br>	wg.Add(num)<br>	<span class="hljs-keyword">var</span> cnt <span class="hljs-type">int32</span><br>	<span class="hljs-keyword">for</span> i := <span class="hljs-number">0</span>; i &lt; num; i++ &#123;<br>		<span class="hljs-keyword">go</span> <span class="hljs-function"><span class="hljs-keyword">func</span><span class="hljs-params">(gid <span class="hljs-type">int</span>)</span></span> &#123;<br>			<span class="hljs-keyword">defer</span> wg.Done()<br>			v, err := Do(<span class="hljs-string">&quot;key1&quot;</span>, <span class="hljs-function"><span class="hljs-keyword">func</span><span class="hljs-params">()</span></span> (<span class="hljs-keyword">interface</span>&#123;&#125;, <span class="hljs-type">error</span>) &#123;<br>				queryDB(gid)<br>				atomic.AddInt32(&amp;cnt, <span class="hljs-number">1</span>)<br>				<span class="hljs-keyword">return</span> time.Now().Unix(), <span class="hljs-literal">nil</span><br>			&#125;)<br>			fmt.Println(<span class="hljs-string">&quot;Goroutine:&quot;</span>, gid, <span class="hljs-string">&quot;----&gt; get data &quot;</span>, v, err)<br>		&#125;(i)<br>	&#125;<br>	wg.Wait()<br>&#125;<br><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">queryDB</span><span class="hljs-params">(gid <span class="hljs-type">int</span>)</span></span> &#123;<br>	<span class="hljs-comment">// 模拟查询DB</span><br>	time.Sleep(<span class="hljs-number">1</span> * time.Second)<br>	fmt.Println(<span class="hljs-string">&quot;Goroutine:&quot;</span>, gid, <span class="hljs-string">&quot;---&gt; querying DB .... &quot;</span>)<br>&#125;<br><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">Do</span><span class="hljs-params">(key <span class="hljs-type">string</span>, fn HandleFn)</span></span> (<span class="hljs-keyword">interface</span>&#123;&#125;, <span class="hljs-type">error</span>) &#123;<br>	mu.Lock()<br>	w, ok := groups[key]<br>	<span class="hljs-keyword">if</span> ok &#123;<br>		mu.Unlock()<br>		w.Wait()<br>		<span class="hljs-keyword">return</span> w.val, w.err<br>	&#125;<br>	c := <span class="hljs-built_in">new</span>(call)<br>	c.Add(<span class="hljs-number">1</span>)<br>	groups[key] = c<br>	mu.Unlock()<br><br>	fmt.Println(<span class="hljs-string">&quot;---&gt;call&quot;</span>)<br>	c.val, c.err = fn()<br><br>	mu.Lock()<br>	c.Done()<br>	<span class="hljs-built_in">delete</span>(groups, key)<br>	mu.Unlock()<br><br>	<span class="hljs-keyword">return</span> c.val, c.err<br>&#125;<br><br></code></pre></td></tr></table></figure>
+<p>输出结果:</p>
+<figure class="highlight xl"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><code class="hljs xl">---&gt;call<br>G<span class="hljs-function"><span class="hljs-title">oroutine</span>: 0 ---&gt;</span> querying DB .... <br>G<span class="hljs-function"><span class="hljs-title">oroutine</span>: 2 ----&gt;</span> get <span class="hljs-keyword">data</span>  <span class="hljs-number">1721205160</span> &lt;<span class="hljs-literal">nil</span>&gt;<br>G<span class="hljs-function"><span class="hljs-title">oroutine</span>: 0 ----&gt;</span> get <span class="hljs-keyword">data</span>  <span class="hljs-number">1721205160</span> &lt;<span class="hljs-literal">nil</span>&gt;<br>G<span class="hljs-function"><span class="hljs-title">oroutine</span>: 1 ----&gt;</span> get <span class="hljs-keyword">data</span>  <span class="hljs-number">1721205160</span> &lt;<span class="hljs-literal">nil</span>&gt;<br>G<span class="hljs-function"><span class="hljs-title">oroutine</span>: 4 ----&gt;</span> get <span class="hljs-keyword">data</span>  <span class="hljs-number">1721205160</span> &lt;<span class="hljs-literal">nil</span>&gt;<br>G<span class="hljs-function"><span class="hljs-title">oroutine</span>: 3 ----&gt;</span> get <span class="hljs-keyword">data</span>  <span class="hljs-number">1721205160</span> &lt;<span class="hljs-literal">nil</span>&gt;<br></code></pre></td></tr></table></figure>
                 
               </div>
             
@@ -349,19 +338,6 @@
             <div>
               <div class="post-metas my-3">
   
-  
-    <div class="post-meta">
-      <i class="iconfont icon-tags"></i>
-      
-        <a href="/tags/GO/" class="print-no-link">#GO</a>
-      
-        <a href="/tags/%E5%8F%AF%E7%94%A8%E6%80%A7%E6%B2%BB%E7%90%86/" class="print-no-link">#可用性治理</a>
-      
-        <a href="/tags/%E9%99%90%E6%B5%81/" class="print-no-link">#限流</a>
-      
-        <a href="/tags/%E5%8D%95%E6%9C%BA%E9%99%90%E6%B5%81/" class="print-no-link">#单机限流</a>
-      
-    </div>
   
 </div>
 
@@ -371,8 +347,8 @@
 
   <div class="license-box my-3">
     <div class="license-title">
-      <div>单机限流实战</div>
-      <div>http://codingwhat.github.io/2024/07/09/limiter-in-action/</div>
+      <div>Single-flight 核心逻辑拆解</div>
+      <div>http://codingwhat.github.io/2024/07/17/single-flight-analysis/</div>
     </div>
     <div class="license-meta">
       
@@ -384,7 +360,7 @@
       
         <div class="license-meta-item license-meta-date">
           <div>发布于</div>
-          <div>2024年7月9日</div>
+          <div>2024年7月17日</div>
         </div>
       
       
@@ -416,18 +392,12 @@
                   <article class="post-prev col-6">
                     
                     
-                      <a href="/2024/07/17/single-flight-analysis/" title="Single-flight 核心逻辑拆解">
-                        <i class="iconfont icon-arrowleft"></i>
-                        <span class="hidden-mobile">Single-flight 核心逻辑拆解</span>
-                        <span class="visible-mobile">上一篇</span>
-                      </a>
-                    
                   </article>
                   <article class="post-next col-6">
                     
                     
-                      <a href="/2024/07/09/go-nginx-502/" title="go_nginx_502问题排查">
-                        <span class="hidden-mobile">go_nginx_502问题排查</span>
+                      <a href="/2024/07/09/limiter-in-action/" title="单机限流实战">
+                        <span class="hidden-mobile">单机限流实战</span>
                         <span class="visible-mobile">下一篇</span>
                         <i class="iconfont icon-arrowright"></i>
                       </a>
