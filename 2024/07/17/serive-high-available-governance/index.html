@@ -16,15 +16,15 @@
   <meta name="author" content="codingWhat">
   <meta name="keywords" content="evanhan codingWhat 博客 韩伟的博客 系统设计 后端开发">
   
-    <meta name="description" content="服务可用性是指一个服务或系统保持运行状态并对用户可访问的能力，用人话讲就是请求你的服务&#x2F;接口能“成功”拿到数据，而可用性治理就是在提升“成功率”，让别人请求你的时候尽量少报错，随着互联网发展，技术也在快速迭代，业界沉淀出了很多优秀的解决方案。这篇文章就服务可用性治理这个话题，分享下我个人的理解和学习心得，也算做个小总结，如有错误，欢迎指正。">
+    <meta name="description" content="服务可用性是指一个服务或系统保持运行状态并对用户可访问的能力，用人话讲就是请求你的服务&#x2F;接口能“成功”拿到数据，而可用性治理就是在提升“成功率”，让别人请求你的时候尽量少报错，随着互联网发展技术在快速迭代，业界也沉淀出了很多优秀的解决方案。这篇文章就服务可用性治理这个话题，分享下我个人的理解和学习心得，也算做个小总结，如有错误，欢迎指正。">
 <meta property="og:type" content="article">
 <meta property="og:title" content="服务可用性治理的思考">
 <meta property="og:url" content="http://codingwhat.github.io/2024/07/17/serive-high-available-governance/index.html">
 <meta property="og:site_name" content="codingWhat Blog">
-<meta property="og:description" content="服务可用性是指一个服务或系统保持运行状态并对用户可访问的能力，用人话讲就是请求你的服务&#x2F;接口能“成功”拿到数据，而可用性治理就是在提升“成功率”，让别人请求你的时候尽量少报错，随着互联网发展，技术也在快速迭代，业界沉淀出了很多优秀的解决方案。这篇文章就服务可用性治理这个话题，分享下我个人的理解和学习心得，也算做个小总结，如有错误，欢迎指正。">
+<meta property="og:description" content="服务可用性是指一个服务或系统保持运行状态并对用户可访问的能力，用人话讲就是请求你的服务&#x2F;接口能“成功”拿到数据，而可用性治理就是在提升“成功率”，让别人请求你的时候尽量少报错，随着互联网发展技术在快速迭代，业界也沉淀出了很多优秀的解决方案。这篇文章就服务可用性治理这个话题，分享下我个人的理解和学习心得，也算做个小总结，如有错误，欢迎指正。">
 <meta property="og:locale" content="zh_CN">
 <meta property="article:published_time" content="2024-07-17T08:41:53.000Z">
-<meta property="article:modified_time" content="2024-07-18T02:35:29.406Z">
+<meta property="article:modified_time" content="2024-07-18T02:47:50.982Z">
 <meta property="article:author" content="codingWhat">
 <meta property="article:tag" content="GO">
 <meta property="article:tag" content="可用性治理">
@@ -252,7 +252,7 @@
       <span class="post-meta mr-2">
         <i class="iconfont icon-chart"></i>
         
-          558 字
+          590 字
         
       </span>
     
@@ -314,13 +314,13 @@
               <div class="markdown-body">
                 
                 <blockquote>
-<p>服务可用性是指一个服务或系统保持运行状态并对用户可访问的能力，用人话讲就是请求你的服务&#x2F;接口能“成功”拿到数据，而可用性治理就是在提升“成功率”，让别人请求你的时候尽量少报错，随着互联网发展，技术也在快速迭代，业界沉淀出了很多优秀的解决方案。这篇文章就服务可用性治理这个话题，分享下我个人的理解和学习心得，也算做个小总结，如有错误，欢迎指正。</p>
+<p>服务可用性是指一个服务或系统保持运行状态并对用户可访问的能力，用人话讲就是请求你的服务&#x2F;接口能“成功”拿到数据，而可用性治理就是在提升“成功率”，让别人请求你的时候尽量少报错，随着互联网发展技术在快速迭代，业界也沉淀出了很多优秀的解决方案。这篇文章就服务可用性治理这个话题，分享下我个人的理解和学习心得，也算做个小总结，如有错误，欢迎指正。</p>
 </blockquote>
 <span id="more"></span>
 
 <p><font color="orange">在开始之前我想强调下，服务可用性治理是成本和可用性之间的权衡艺术，这个平衡需要业务自己把控, 不要极端。 说白话就是不要在极低概率的问题花费太多财力和精力，切记公司是要挣钱的！</font></p>
-<p>就像引言说的，可用性治理说白了就是一一解决让服务不可用的问题，我大体将这些问题分为如下两类：</p>
-<ol>
+<p>就像引言说的，可用性治理就是在治理”成功率”，反过来说就是一一解决让服务不可用的问题，我大体将这些问题分为如下两类：</p>
+<h2 id="问题分类"><a href="#问题分类" class="headerlink" title="问题分类"></a>问题分类</h2><ol>
 <li>外部</li>
 </ol>
 <ul>
@@ -335,6 +335,7 @@
 <li>服务本身, 比如死锁,资源泄漏，超时控制不合理</li>
 <li>服务依赖的组件或服务, 比如存储、缓存、或者其他服务</li>
 </ul>
+<h2 id="治理图"><a href="#治理图" class="headerlink" title="治理图"></a>治理图</h2><p>给出每个问题的解决方案，包含可观测</p>
 <h2 id="治理方法论"><a href="#治理方法论" class="headerlink" title="治理方法论"></a>治理方法论</h2><ol>
 <li>定义服务指标(SLO,SLI)</li>
 <li>检查服务指标</li>
