@@ -24,7 +24,7 @@
 <meta property="og:description" content="作为服务提供者即便可以做不同规模的容量模型，但是面对未知的外部流量不可能做到准确预测的，为了应对海量流量的冲击，服务必须得采取自保护策略，丢弃掉部分流量来保障服务的稳定性。">
 <meta property="og:locale" content="zh_CN">
 <meta property="article:published_time" content="2024-07-09T09:42:14.000Z">
-<meta property="article:modified_time" content="2024-07-18T02:04:32.693Z">
+<meta property="article:modified_time" content="2024-07-18T02:06:05.776Z">
 <meta property="article:author" content="codingWhat">
 <meta property="article:tag" content="GO">
 <meta property="article:tag" content="可用性治理">
@@ -252,7 +252,7 @@
       <span class="post-meta mr-2">
         <i class="iconfont icon-chart"></i>
         
-          773 字
+          801 字
         
       </span>
     
@@ -318,7 +318,7 @@
 </blockquote>
 <span id="more"></span>
 
-<p>在服务可用性治理中，过载保护分静态和动态限流两种手段。</p>
+<p>在服务可用性治理中，限流可以在客户端也可以在服务端，服务端限流一般分为静态和动态两种类型(服务端限流也叫过载保护)。</p>
 <h2 id="单机限流分两种类型"><a href="#单机限流分两种类型" class="headerlink" title="单机限流分两种类型:"></a>单机限流分两种类型:</h2><h3 id="静态限流"><a href="#静态限流" class="headerlink" title="静态限流"></a>静态限流</h3><ol>
 <li>令牌桶, 支持短时间瞬时流量</li>
 <li>漏桶, 匀速限流</li>
