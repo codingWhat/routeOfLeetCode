@@ -31,7 +31,7 @@
 <meta property="og:image" content="http://codingwhat.github.io/images/two_idc.png">
 <meta property="og:image" content="http://codingwhat.github.io/images/api_gateway_failover.png">
 <meta property="article:published_time" content="2024-07-17T08:41:53.000Z">
-<meta property="article:modified_time" content="2024-07-22T09:08:00.421Z">
+<meta property="article:modified_time" content="2024-07-22T09:11:22.675Z">
 <meta property="article:author" content="codingWhat">
 <meta property="article:tag" content="GO">
 <meta property="article:tag" content="可用性治理">
@@ -260,7 +260,7 @@
       <span class="post-meta mr-2">
         <i class="iconfont icon-chart"></i>
         
-          2.6k 字
+          2.3k 字
         
       </span>
     
@@ -271,7 +271,7 @@
         
         
         
-          22 分钟
+          19 分钟
         
       </span>
     
@@ -334,34 +334,7 @@
 </ul>
 <h2 id="限流"><a href="#限流" class="headerlink" title="限流"></a>限流</h2><p><img src="/images/limiter.png" srcset="/img/loading.gif" lazyload alt="限流模型"></p>
 <p>我们知道单节点的处理能力是有限的，因此我们必须限制进入系统的流量, 限流是实现这一目标的第一步<br>限流主要有两大类，一种是静态限流，它通过设置固定限流阈值去限制节点的QPS。另一种是自适应限流，它更加高级一点，会根据服务当前的负载动态调整限流阈值，限流效果更好。</p>
-<h3 id="静态限流"><a href="#静态限流" class="headerlink" title="静态限流"></a>静态限流</h3><ul>
-<li><a href="golang.org/x/time/rate">标准库-令牌桶</a>, 应对小规模突发流量;</li>
-<li><a target="_blank" rel="noopener" href="https://github.com/uber-go/ratelimit">Uber-漏桶</a>, 匀速限流; 突发流量丢弃量多; !!这个库(v0.3.0)有bug<a target="_blank" rel="noopener" href="https://colobu.com/2023/12/05/two-bugs-of-uber-ratelimit/">点击</a></li>
-<li>滑动窗口, 精度高; 占用内存</li>
-<li>固定窗口, 实现简单; 不精准，存在边界问题</li>
-</ul>
-<p>优点: 实现简单<br>缺点:<br>1.基于QPS限流, 限流阈值不好配置(请求的处理成本不一致)<br>2.节点扩缩, 需要重新设置</p>
-<h3 id="自适应限流-✅推荐"><a href="#自适应限流-✅推荐" class="headerlink" title="自适应限流[✅推荐]"></a>自适应限流[✅推荐]</h3><ul>
-<li><a target="_blank" rel="noopener" href="https://github.com/go-kratos/aegis/tree/main/ratelimit/bbr">B站-BBR</a></li>
-<li><a target="_blank" rel="noopener" href="https://github.com/alibaba/sentinel-golang/wiki/%E7%B3%BB%E7%BB%9F%E8%87%AA%E9%80%82%E5%BA%94%E6%B5%81%E6%8E%A7">sentinel-go</a></li>
-<li>Co-DEL，采用队列去管理请求，超时请求就自动被拒绝。看B站的实现有个点就是，会有2个容忍窗口的逻辑: 容忍窗口期间请求还是会被放行, 超过窗口的再被拒绝。</li>
-</ul>
-<p>b站-BBR, 主要依赖以下两个指标:</p>
-<ul>
-<li>CPU使用率</li>
-<li>MaxInflight(1s的最大吞吐) &#x3D; (MaxPass(窗口内最大成功请求数) * MinRt(平均响应延时:ms) * BucketsPerSecond(1s的桶个数) &#x2F;1000.0)<br>tips: math.Floor(MaxInflight + 0.5) 做了四舍五入</li>
-</ul>
-<p>sentinel-go:</p>
-<ul>
-<li>load1 (实时性较较差, 1分钟内的负载)</li>
-<li>MaxInflight(1s的最大吞吐) 如上</li>
-</ul>
-<p>优点:<br>1.精确限流<br>2.动态调整阈值, 和服务负载正相关</p>
-<p>缺点: 实现复杂，需要额外统计CPU使用率、QPS吞吐</p>
-<h3 id="限流注意事项"><a href="#限流注意事项" class="headerlink" title="限流注意事项"></a>限流注意事项</h3><ul>
-<li>请求分优先级(用户纬度)，可按优先级丢弃、可以存在一定超卖。</li>
-<li>拒绝请求也需要成本, cliet端需要截流(直接往上抛或者重试其他节点)</li>
-</ul>
+<p>这部分之前写过，就不再<a href="https://codingwhat.github.io/2024/07/09/limiter-in-action/">重复了</a></p>
 <h2 id="熔断"><a href="#熔断" class="headerlink" title="熔断"></a>熔断</h2><ul>
 <li>传统断路器，<a target="_blank" rel="noopener" href="https://github.com/afex/hystrix-go">hystrix-go</a>&#x2F;<a target="_blank" rel="noopener" href="https://github.com/alibaba/sentinel-golang/tree/master/core/circuitbreaker">sentinel-go</a></li>
 <li>自适应熔断, google sre-breaker</li>
