@@ -31,7 +31,7 @@
 <meta property="og:image" content="http://codingwhat.github.io/images/two_idc.png">
 <meta property="og:image" content="http://codingwhat.github.io/images/api_gateway_failover.png">
 <meta property="article:published_time" content="2024-07-17T08:41:53.000Z">
-<meta property="article:modified_time" content="2024-07-22T09:11:22.675Z">
+<meta property="article:modified_time" content="2024-07-22T09:11:41.934Z">
 <meta property="article:author" content="codingWhat">
 <meta property="article:tag" content="GO">
 <meta property="article:tag" content="可用性治理">
@@ -334,7 +334,7 @@
 </ul>
 <h2 id="限流"><a href="#限流" class="headerlink" title="限流"></a>限流</h2><p><img src="/images/limiter.png" srcset="/img/loading.gif" lazyload alt="限流模型"></p>
 <p>我们知道单节点的处理能力是有限的，因此我们必须限制进入系统的流量, 限流是实现这一目标的第一步<br>限流主要有两大类，一种是静态限流，它通过设置固定限流阈值去限制节点的QPS。另一种是自适应限流，它更加高级一点，会根据服务当前的负载动态调整限流阈值，限流效果更好。</p>
-<p>这部分之前写过，就不再<a href="https://codingwhat.github.io/2024/07/09/limiter-in-action/">重复了</a></p>
+<p>这部分之前写过，就不再重复了<a href="https://codingwhat.github.io/2024/07/09/limiter-in-action/">限流实战</a></p>
 <h2 id="熔断"><a href="#熔断" class="headerlink" title="熔断"></a>熔断</h2><ul>
 <li>传统断路器，<a target="_blank" rel="noopener" href="https://github.com/afex/hystrix-go">hystrix-go</a>&#x2F;<a target="_blank" rel="noopener" href="https://github.com/alibaba/sentinel-golang/tree/master/core/circuitbreaker">sentinel-go</a></li>
 <li>自适应熔断, google sre-breaker</li>
