@@ -26,7 +26,7 @@
 <meta property="og:image" content="http://codingwhat.github.io/images/limiter.png">
 <meta property="og:image" content="http://codingwhat.github.io/images/circuit_breaker.png">
 <meta property="article:published_time" content="2024-07-17T08:41:53.000Z">
-<meta property="article:modified_time" content="2024-07-22T04:13:29.867Z">
+<meta property="article:modified_time" content="2024-07-22T04:17:12.954Z">
 <meta property="article:author" content="codingWhat">
 <meta property="article:tag" content="GO">
 <meta property="article:tag" content="可用性治理">
@@ -266,7 +266,7 @@
         
         
         
-          18 分钟
+          17 分钟
         
       </span>
     
@@ -385,7 +385,7 @@
 <ul>
 <li>grpc中是通过http2的HEADERS Frame透传， <code>grpc-timeout</code> 字段</li>
 </ul>
-<p><strong>服务内超时控制:</strong><br>假设服务超时为600ms，有三个串行的RPC调用[A(500ms), B(300ms), C(100ms)]，虽然请求可以服务超时之后立即返回，但是调用B时会等待300ms后会触发超时。但是这里每次在rpc调用时超时时间设置是可以优化的，timeout&#x3D;min(timeout, time.Util(deadline)),比如deadline剩10ms，rpc超时为100ms，那就没必要等100ms。<br>(http请求，go已经帮我们做好了)<br><strong>如何传递?</strong></p>
+<p><strong>服务内超时控制:</strong><br>假设服务超时为600ms，有三个串行的RPC调用[A(500ms), B(300ms), C(100ms)]，在调用B时会等待300ms后会触发超时。很明显这里超时是可以优化的, timeout&#x3D;min(timeout, time.Util(deadline)), 比如deadline剩10ms，rpc超时为100ms，那就没必要等100ms。(http请求，go已经帮我们做好了)<br><strong>如何传递?</strong></p>
 <details>
   <summary> 利用context.WithTimeout 实现</summary>
 
