@@ -24,7 +24,7 @@
 <meta property="og:description" content="作为服务提供者即便可以做不同规模的容量模型，但是面对未知的外部流量不可能做到准确预测的，为了应对海量流量的冲击，服务必须得采取自保护策略，丢弃掉部分流量来保障服务的稳定性。">
 <meta property="og:locale" content="zh_CN">
 <meta property="article:published_time" content="2024-07-09T09:42:14.000Z">
-<meta property="article:modified_time" content="2024-07-22T09:13:36.741Z">
+<meta property="article:modified_time" content="2024-07-22T09:46:23.398Z">
 <meta property="article:author" content="codingWhat">
 <meta property="article:tag" content="GO">
 <meta property="article:tag" content="可用性治理">
@@ -333,7 +333,7 @@
 </li>
 <li><p>Co-DEL，采用队列去管理请求，超时请求就自动被拒绝。看B站的实现有个点就是，会有2个容忍窗口的逻辑: 容忍窗口期间请求还是会被放行, 超过窗口的再被拒绝。</p>
 </li>
-<li><p>优点: 服务自适应限流限流；在静态限流基础上，通过当前实例的负载情况(采样窗口,cpu&#x2F;load)进行动态设置限流阈值，让服务保持高水位高校运行。</p>
+<li><p>优点: 服务自适应限流限流；在静态限流的基础上，通过当前实例的负载情况(采样窗口内的cpu使用率&#x2F;load1)进行动态设置限流阈值，让服务保持高水位高效运行。</p>
 </li>
 <li><p>缺点: 实现复杂</p>
 </li>
@@ -341,14 +341,15 @@
 </li>
 <li><p><a target="_blank" rel="noopener" href="https://github.com/alibaba/sentinel-golang/wiki/%E7%B3%BB%E7%BB%9F%E8%87%AA%E9%80%82%E5%BA%94%E6%B5%81%E6%8E%A7">sentinel-go</a></p>
 </li>
-<li><p>Co-DEL，采用队列去管理请求，超时请求就自动被拒绝。看B站的实现有个点就是，会有2个容忍窗口的逻辑: 容忍窗口期间请求还是会被放行, 超过窗口的再被拒绝。</p>
+<li><p>Co-DEL，采用队列去管理请求，超时请求就自动被拒绝。B站的实现有2个容忍窗口, 容忍窗口期间请求还是会被放行, 超过窗口的才会被拒绝。</p>
 </li>
 </ul>
 <p>b站-BBR, 主要依赖以下两个指标:</p>
 <ul>
 <li>CPU使用率</li>
-<li>MaxInflight(1s的最大吞吐) &#x3D; (MaxPass(窗口内最大成功请求数) * MinRt(平均响应延时:ms) * BucketsPerSecond(1s的桶个数) &#x2F;1000.0)<br>tips: math.Floor(MaxInflight + 0.5) 做了四舍五入</li>
+<li>MaxInflight(1s的最大吞吐) &#x3D; (MaxPass(窗口内最大成功请求数) * MinRt(平均响应延时:ms) * BucketsPerSecond(1s的桶个数) &#x2F;1000.0)</li>
 </ul>
+<p>tips: math.Floor(MaxInflight + 0.5) 做了四舍五入</p>
 <p>sentinel-go:</p>
 <ul>
 <li>load1 (实时性较较差, 1分钟内的负载)</li>
