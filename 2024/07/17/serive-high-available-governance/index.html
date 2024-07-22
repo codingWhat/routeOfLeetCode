@@ -31,7 +31,7 @@
 <meta property="og:image" content="http://codingwhat.github.io/images/two_idc.png">
 <meta property="og:image" content="http://codingwhat.github.io/images/api_gateway_failover.png">
 <meta property="article:published_time" content="2024-07-17T08:41:53.000Z">
-<meta property="article:modified_time" content="2024-07-22T09:40:15.845Z">
+<meta property="article:modified_time" content="2024-07-22T09:50:16.682Z">
 <meta property="article:author" content="codingWhat">
 <meta property="article:tag" content="GO">
 <meta property="article:tag" content="可用性治理">
@@ -393,7 +393,7 @@
 <li>默认值兜底，报错返回默认值</li>
 <li>功能降级，下线非核心功能</li>
 </ul>
-<h1 id="架构"><a href="#架构" class="headerlink" title="架构"></a>架构</h1><h2 id="冗余架构"><a href="#冗余架构" class="headerlink" title="冗余架构"></a>冗余架构</h2><ul>
+<h2 id="重试"><a href="#重试" class="headerlink" title="重试"></a>重试</h2><h3 id="如何重试"><a href="#如何重试" class="headerlink" title="如何重试?"></a>如何重试?</h3><h3 id="重试风暴"><a href="#重试风暴" class="headerlink" title="重试风暴"></a>重试风暴</h3><h3 id="对冲"><a href="#对冲" class="headerlink" title="对冲"></a>对冲</h3><h1 id="架构"><a href="#架构" class="headerlink" title="架构"></a>架构</h1><h2 id="冗余架构"><a href="#冗余架构" class="headerlink" title="冗余架构"></a>冗余架构</h2><ul>
 <li>集群</li>
 <li>多机房</li>
 <li>多IDC</li>
@@ -427,9 +427,12 @@
 <li>预分配<br>这部分就不过多介绍，可以<a href="https://codingwhat.github.io/2024/07/09/limiter-in-action/">这篇文章</a></li>
 </ul>
 <h2 id="隔离"><a href="#隔离" class="headerlink" title="隔离"></a>隔离</h2><ul>
-<li>线程、进程(容器部署)、集群隔离</li>
+<li>线程隔离</li>
+<li>进程隔离(容器部署)</li>
+<li>集群隔离</li>
+<li>动静隔离</li>
+<li>核心隔离</li>
 <li>读写隔离</li>
-<li>资源隔离(独立的机器&#x2F;存储)</li>
 <li>热点隔离</li>
 <li>协程隔离</li>
 </ul>
