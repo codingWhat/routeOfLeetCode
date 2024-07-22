@@ -18,23 +18,24 @@
   
     <meta name="description" content="作为服务提供者即便可以做不同规模的容量模型，但是面对未知的外部流量不可能做到准确预测的，为了应对海量流量的冲击，服务必须得采取自保护策略，丢弃掉部分流量来保障服务的稳定性。">
 <meta property="og:type" content="article">
-<meta property="og:title" content="单机限流实战">
+<meta property="og:title" content="限流实战">
 <meta property="og:url" content="http://codingwhat.github.io/2024/07/09/limiter-in-action/index.html">
 <meta property="og:site_name" content="codingWhat Blog">
 <meta property="og:description" content="作为服务提供者即便可以做不同规模的容量模型，但是面对未知的外部流量不可能做到准确预测的，为了应对海量流量的冲击，服务必须得采取自保护策略，丢弃掉部分流量来保障服务的稳定性。">
 <meta property="og:locale" content="zh_CN">
 <meta property="article:published_time" content="2024-07-09T09:42:14.000Z">
-<meta property="article:modified_time" content="2024-07-22T02:18:42.533Z">
+<meta property="article:modified_time" content="2024-07-22T09:05:38.036Z">
 <meta property="article:author" content="codingWhat">
 <meta property="article:tag" content="GO">
 <meta property="article:tag" content="可用性治理">
 <meta property="article:tag" content="限流">
 <meta property="article:tag" content="单机限流">
+<meta property="article:tag" content="分布式限流">
 <meta name="twitter:card" content="summary_large_image">
   
   
   
-  <title>单机限流实战 - codingWhat Blog</title>
+  <title>限流实战 - codingWhat Blog</title>
 
   <link  rel="stylesheet" href="https://lib.baomitu.com/twitter-bootstrap/4.6.1/css/bootstrap.min.css" />
 
@@ -229,7 +230,7 @@
       <div class="banner-text text-center fade-in-up">
         <div class="h2">
           
-            <span id="subtitle" data-typed-text="单机限流实战"></span>
+            <span id="subtitle" data-typed-text="限流实战"></span>
           
         </div>
 
@@ -308,7 +309,7 @@
       <div class="container nopadding-x-md" id="board-ctn">
         <div id="board">
           <article class="post-content mx-auto">
-            <h1 id="seo-header">单机限流实战</h1>
+            <h1 id="seo-header">限流实战</h1>
             
             
               <div class="markdown-body">
@@ -317,7 +318,6 @@
 <p>作为服务提供者即便可以做不同规模的容量模型，但是面对未知的外部流量不可能做到准确预测的，为了应对海量流量的冲击，服务必须得采取自保护策略，丢弃掉部分流量来保障服务的稳定性。</p>
 </blockquote>
 <span id="more"></span>
-
 <p>限流位置是动态的，既可以在客户端也可以在服务端，而服务端限流一般分为静态和动态(自适应)两种类型(服务端限流也叫过载保护)。</p>
 <h2 id="服务端限流"><a href="#服务端限流" class="headerlink" title="服务端限流:"></a>服务端限流:</h2><h3 id="静态限流"><a href="#静态限流" class="headerlink" title="静态限流"></a>静态限流</h3><ul>
 <li><a href="golang.org/x/time/rate">标准库-令牌桶</a>, 应对小规模突发流量;</li>
@@ -363,7 +363,7 @@
 <li>在测试限流时，要设置合理的sleep时间，才能看出限流效果。<br>假设rate:1000(1s&#x2F;1000 -&gt; 1ms&#x2F;1), 想要模拟成功和拒绝是1:1，那就在sleep:500*time.Microsecond</li>
 <li>随着你测的rate越来越高，可能会发现success&#x2F;reject开始不精准，这是因为time.Sleep休眠时间不精确导致的，所以不用担心，<br>Sleep精准问题有兴趣可以看看<a target="_blank" rel="noopener" href="https://colobu.com/2023/12/07/more-precise-sleep/">这篇文章</a></li>
 </ol>
-
+<h2 id="分布式限流"><a href="#分布式限流" class="headerlink" title="分布式限流"></a>分布式限流</h2>
                 
               </div>
             
@@ -383,6 +383,8 @@
       
         <a href="/tags/%E5%8D%95%E6%9C%BA%E9%99%90%E6%B5%81/" class="print-no-link">#单机限流</a>
       
+        <a href="/tags/%E5%88%86%E5%B8%83%E5%BC%8F%E9%99%90%E6%B5%81/" class="print-no-link">#分布式限流</a>
+      
     </div>
   
 </div>
@@ -393,7 +395,7 @@
 
   <div class="license-box my-3">
     <div class="license-title">
-      <div>单机限流实战</div>
+      <div>限流实战</div>
       <div>http://codingwhat.github.io/2024/07/09/limiter-in-action/</div>
     </div>
     <div class="license-meta">
