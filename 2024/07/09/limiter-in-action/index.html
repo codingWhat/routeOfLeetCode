@@ -24,7 +24,7 @@
 <meta property="og:description" content="作为服务提供者即便可以做不同规模的容量模型，但是面对未知的外部流量不可能做到准确预测的，为了应对海量流量的冲击，服务必须得采取自保护策略，丢弃掉部分流量来保障服务的稳定性。">
 <meta property="og:locale" content="zh_CN">
 <meta property="article:published_time" content="2024-07-09T09:42:14.000Z">
-<meta property="article:modified_time" content="2024-07-22T09:09:48.073Z">
+<meta property="article:modified_time" content="2024-07-22T09:13:36.741Z">
 <meta property="article:author" content="codingWhat">
 <meta property="article:tag" content="GO">
 <meta property="article:tag" content="可用性治理">
@@ -326,7 +326,7 @@
 <li>固定窗口, 实现简单; 不精准，存在边界问题</li>
 </ul>
 <p>共性:<br>优点: 实现简单<br>缺点:<br>1.基于QPS限流静态限流, 无法根据服务的负载动态限流<br>2.限流阈值不好配置(请求的处理成本不一致)<br>3.节点扩缩, 需要重新设置</p>
-<h3 id="动态限流-推荐"><a href="#动态限流-推荐" class="headerlink" title="动态限流[推荐]:"></a>动态限流[推荐]:</h3><ul>
+<h3 id="动态限流-推荐"><a href="#动态限流-推荐" class="headerlink" title="动态限流[推荐]"></a>动态限流[推荐]</h3><ul>
 <li><p><a target="_blank" rel="noopener" href="https://github.com/go-kratos/aegis/tree/main/ratelimit/bbr">B站-BBR</a></p>
 </li>
 <li><p><a target="_blank" rel="noopener" href="https://github.com/alibaba/sentinel-golang/wiki/%E7%B3%BB%E7%BB%9F%E8%87%AA%E9%80%82%E5%BA%94%E6%B5%81%E6%8E%A7">sentinel-go</a></p>
