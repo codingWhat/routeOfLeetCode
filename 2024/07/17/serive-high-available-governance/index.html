@@ -28,10 +28,15 @@
 <meta property="og:image" content="http://codingwhat.github.io/images/sre_breaker.png">
 <meta property="og:image" content="http://codingwhat.github.io/images/timeout_propagation.png">
 <meta property="og:image" content="http://codingwhat.github.io/images/ema.png">
+<meta property="og:image" content="http://codingwhat.github.io/images/hedging.png">
 <meta property="og:image" content="http://codingwhat.github.io/images/two_idc.png">
 <meta property="og:image" content="http://codingwhat.github.io/images/api_gateway_failover.png">
+<meta property="og:image" content="http://codingwhat.github.io/images/maglev.png">
+<meta property="og:image" content="http://codingwhat.github.io/images/fe_lb.png">
+<meta property="og:image" content="http://codingwhat.github.io/images/google_subset.png">
+<meta property="og:image" content="http://codingwhat.github.io/images/bilibili_p2c.png">
 <meta property="article:published_time" content="2024-07-17T08:41:53.000Z">
-<meta property="article:modified_time" content="2024-07-22T09:50:16.682Z">
+<meta property="article:modified_time" content="2024-07-23T09:58:51.592Z">
 <meta property="article:author" content="codingWhat">
 <meta property="article:tag" content="GO">
 <meta property="article:tag" content="可用性治理">
@@ -260,7 +265,7 @@
       <span class="post-meta mr-2">
         <i class="iconfont icon-chart"></i>
         
-          2.4k 字
+          4.2k 字
         
       </span>
     
@@ -271,7 +276,7 @@
         
         
         
-          21 分钟
+          36 分钟
         
       </span>
     
@@ -389,11 +394,35 @@
 <h2 id="降级"><a href="#降级" class="headerlink" title="降级"></a>降级</h2><p>降级一般有以下几种策略</p>
 <ul>
 <li>一致性降级，强一致变弱一致</li>
-<li>同步变异步</li>
-<li>默认值兜底，报错返回默认值</li>
 <li>功能降级，下线非核心功能</li>
+<li>用户体验降级, 不展示用户标签、个性化信息等</li>
+<li>同步转异步，同步逻辑转化为异步，会有些延迟</li>
 </ul>
-<h2 id="重试"><a href="#重试" class="headerlink" title="重试"></a>重试</h2><h3 id="如何重试"><a href="#如何重试" class="headerlink" title="如何重试?"></a>如何重试?</h3><h3 id="重试风暴"><a href="#重试风暴" class="headerlink" title="重试风暴"></a>重试风暴</h3><h3 id="对冲"><a href="#对冲" class="headerlink" title="对冲"></a>对冲</h3><h1 id="架构"><a href="#架构" class="headerlink" title="架构"></a>架构</h1><h2 id="冗余架构"><a href="#冗余架构" class="headerlink" title="冗余架构"></a>冗余架构</h2><ul>
+<p>降级一般都和限流、熔断放在一起讨论，适合具体问题具体分析，本质是提供有损服务。这里就不多介绍理论内容，我给大家举几个实际场景，感受下即可。</p>
+<ol>
+<li>双11为了节省资源，tb或pdd会暂时关闭退货功能</li>
+<li>视频平台推荐页会缓存首页的数据，防止进来就是白页</li>
+<li>评论列表里有用户的各种信息，比如勋章等身份信息，如果获取失败这里返回空</li>
+<li>还有一些计数场景，app评论&#x2F;点赞，如果是同步操作，很容易因为网络问题直接报错体验不好。一般都是异步静默提交，页面做假显。</li>
+</ol>
+<h2 id="重试"><a href="#重试" class="headerlink" title="重试"></a>重试</h2><h3 id="重试识别"><a href="#重试识别" class="headerlink" title="重试识别"></a>重试识别</h3><p>可以通过http staus code识别错误类型，比如4xx类型明显就是请求有问题就别重试了；还有些情况可能需要根据响应中code码去识别，比如参数错误、鉴权失败等也不应该重试。</p>
+<h3 id="重试策略"><a href="#重试策略" class="headerlink" title="重试策略"></a>重试策略</h3><p>确认重试之后，首先要限制重试的比例，其次重点关注重试次数和重试间隔，重试间隔我们可以采用以下策略:</p>
+<ul>
+<li>固定间隔，一秒一次，总三次；但是这种策略很容易出现重试波峰</li>
+<li>随机间隔，打散重试时间，减少冲hi波峰；虽然每个请求重试时间不一样，但是下游如果短时间内不能恢复，就会收到大量请求可能会造成服务雪崩。</li>
+<li>随机 + 指数退避, 减少了重试波峰以及对下游的重试压力；超时配置需要注意，不要影响核心链路的耗时</li>
+</ul>
+<h3 id="对冲策略"><a href="#对冲策略" class="headerlink" title="对冲策略"></a>对冲策略</h3><p>这个概念源自GRPC, 是指在不等待响应的情况下主调主动发送多个请求，本质是更加激进的重试。 适用于一些流量不大的场景，可以缓解短暂网络抖动导致的长尾请求，不过一定确认好重试对下游负载的影响。<br>如下图，假设主调和被调超时时间为60ms，第一个请求发出之后会触发一个10ms定时器, 假设主调在10ms内没有收到响应，定时器就会触发立即发送重试请求，如果重试请求响应先返回了，就会立即返回，第一个请求的响应会被主调丢弃。<br><img src="/images/hedging.png" srcset="/img/loading.gif" lazyload alt="对冲模型"></p>
+<details> <summary>对冲模拟实现</summary>
+<figure class="highlight golang"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br><span class="line">117</span><br><span class="line">118</span><br><span class="line">119</span><br><span class="line">120</span><br><span class="line">121</span><br><span class="line">122</span><br><span class="line">123</span><br><span class="line">124</span><br><span class="line">125</span><br><span class="line">126</span><br><span class="line">127</span><br></pre></td><td class="code"><pre><code class="hljs golang"><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">main</span><span class="hljs-params">()</span></span> &#123;<br><br>	request, err := http.NewRequest(<span class="hljs-string">&quot;Get&quot;</span>, <span class="hljs-string">&quot;http://www.baidu.com&quot;</span>, <span class="hljs-literal">nil</span>)<br>	<span class="hljs-keyword">if</span> err != <span class="hljs-literal">nil</span> &#123;<br>		<span class="hljs-built_in">panic</span>(err)<br>	&#125;<br>	hedged, err := retryHedged(request, <span class="hljs-number">3</span>, <span class="hljs-number">10</span>*time.Millisecond, <span class="hljs-number">10</span>*time.Second, Backoff)<br>	fmt.Println(hedged, err)<br>&#125;<br><br><span class="hljs-keyword">type</span> RetryStrategy <span class="hljs-function"><span class="hljs-keyword">func</span><span class="hljs-params">(<span class="hljs-type">int</span>)</span></span> time.Duration<br><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">Backoff</span><span class="hljs-params">(retryNum <span class="hljs-type">int</span>)</span></span> time.Duration &#123;<br>	<span class="hljs-keyword">return</span> time.Duration(retryNum*<span class="hljs-number">2</span>+<span class="hljs-number">2</span>) * time.Millisecond<br>&#125;<br><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">retryHedged</span><span class="hljs-params">(req *http.Request, maxRetries <span class="hljs-type">int</span>, hedgeDelay time.Duration, reqTimeout time.Duration, rs RetryStrategy)</span></span> (*http.Response, <span class="hljs-type">error</span>) &#123;<br>	<span class="hljs-keyword">var</span> (<br>		originalBody []<span class="hljs-type">byte</span><br>		err          <span class="hljs-type">error</span><br>	)<br>	<span class="hljs-keyword">if</span> req != <span class="hljs-literal">nil</span> &amp;&amp; req.Body != <span class="hljs-literal">nil</span> &#123;<br>		originalBody, err = copyBody(req.Body)<br>	&#125;<br>	<span class="hljs-keyword">if</span> err != <span class="hljs-literal">nil</span> &#123;<br>		<span class="hljs-keyword">return</span> <span class="hljs-literal">nil</span>, err<br>	&#125;<br><br>	AttemptLimit := maxRetries<br>	<span class="hljs-keyword">if</span> AttemptLimit &lt;= <span class="hljs-number">0</span> &#123;<br>		AttemptLimit = <span class="hljs-number">1</span><br>	&#125;<br><br>	client := http.Client&#123;<br>		Timeout: reqTimeout,<br>	&#125;<br><br>	<span class="hljs-comment">// 每次请求copy新的request</span><br>	copyRequest := <span class="hljs-function"><span class="hljs-keyword">func</span><span class="hljs-params">()</span></span> (request *http.Request) &#123;<br>		request = req.Clone(req.Context())<br>		<span class="hljs-keyword">if</span> request.Body != <span class="hljs-literal">nil</span> &#123;<br>			resetBody(request, originalBody)<br>		&#125;<br>		<span class="hljs-keyword">return</span><br>	&#125;<br><br>	multiplexCh := <span class="hljs-built_in">make</span>(<span class="hljs-keyword">chan</span> <span class="hljs-keyword">struct</span> &#123;<br>		resp  *http.Response<br>		err   <span class="hljs-type">error</span><br>		retry <span class="hljs-type">int</span><br>	&#125;)<br><br>	totalSentRequests := &amp;sync.WaitGroup&#123;&#125;<br>	allRequestsBackCh := <span class="hljs-built_in">make</span>(<span class="hljs-keyword">chan</span> <span class="hljs-keyword">struct</span>&#123;&#125;)<br>	<span class="hljs-keyword">go</span> <span class="hljs-function"><span class="hljs-keyword">func</span><span class="hljs-params">()</span></span> &#123;<br>		totalSentRequests.Wait()<br>		<span class="hljs-built_in">close</span>(allRequestsBackCh)<br>	&#125;()<br>	<span class="hljs-keyword">var</span> resp *http.Response<br><br>	<span class="hljs-keyword">var</span> (<br>		canHedge   <span class="hljs-type">uint32</span><br>		readyHedge = <span class="hljs-built_in">make</span>(<span class="hljs-keyword">chan</span> <span class="hljs-keyword">struct</span>&#123;&#125;)<br>	)<br>	<span class="hljs-keyword">for</span> i := <span class="hljs-number">0</span>; i &lt; AttemptLimit; i++ &#123;<br>		totalSentRequests.Add(<span class="hljs-number">1</span>)<br><br>		<span class="hljs-keyword">go</span> <span class="hljs-function"><span class="hljs-keyword">func</span><span class="hljs-params">(i <span class="hljs-type">int</span>)</span></span> &#123;<br>			<span class="hljs-keyword">if</span> atomic.CompareAndSwapUint32(&amp;canHedge, <span class="hljs-number">0</span>, <span class="hljs-number">1</span>) &#123;<br>				<span class="hljs-keyword">go</span> <span class="hljs-function"><span class="hljs-keyword">func</span><span class="hljs-params">()</span></span> &#123;<br>					&lt;-time.After(hedgeDelay)<br>					readyHedge &lt;- <span class="hljs-keyword">struct</span>&#123;&#125;&#123;&#125;<br>				&#125;()<br>			&#125; <span class="hljs-keyword">else</span> &#123;<br>				&lt;-readyHedge<br>				time.Sleep(rs(i))<br>			&#125;<br>			<span class="hljs-comment">// 标记已经执行完</span><br>			<span class="hljs-keyword">defer</span> totalSentRequests.Done()<br>			req = copyRequest()<br>			resp, err = client.Do(req)<br>			<span class="hljs-keyword">if</span> err != <span class="hljs-literal">nil</span> &#123;<br>				fmt.Printf(<span class="hljs-string">&quot;error sending the first time: %v\n&quot;</span>, err)<br>			&#125;<br>			<span class="hljs-comment">// 重试 500 以上的错误码</span><br>			<span class="hljs-keyword">if</span> err == <span class="hljs-literal">nil</span> &amp;&amp; resp.StatusCode &lt; <span class="hljs-number">500</span> &#123;<br>				multiplexCh &lt;- <span class="hljs-keyword">struct</span> &#123;<br>					resp  *http.Response<br>					err   <span class="hljs-type">error</span><br>					retry <span class="hljs-type">int</span><br>				&#125;&#123;resp: resp, err: err, retry: i&#125;<br>				<span class="hljs-keyword">return</span><br>			&#125;<br>			<span class="hljs-comment">// 如果正在重试，那么释放fd</span><br>			<span class="hljs-keyword">if</span> resp != <span class="hljs-literal">nil</span> &#123;<br>				resp.Body.Close()<br>			&#125;<br>			<span class="hljs-comment">// 重置body</span><br>			<span class="hljs-keyword">if</span> req.Body != <span class="hljs-literal">nil</span> &#123;<br>				resetBody(req, originalBody)<br>			&#125;<br>		&#125;(i)<br>	&#125;<br><br>	<span class="hljs-keyword">select</span> &#123;<br>	<span class="hljs-keyword">case</span> res := &lt;-multiplexCh:<br>		<span class="hljs-keyword">return</span> res.resp, res.err<br>	<span class="hljs-keyword">case</span> &lt;-allRequestsBackCh:<br>		<span class="hljs-comment">// 到这里，说明全部的 goroutine 都执行完毕，但是都请求失败了</span><br>		<span class="hljs-keyword">return</span> <span class="hljs-literal">nil</span>, errors.New(<span class="hljs-string">&quot;all req finish，but all fail&quot;</span>)<br>	&#125;<br>&#125;<br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">copyBody</span><span class="hljs-params">(src io.ReadCloser)</span></span> ([]<span class="hljs-type">byte</span>, <span class="hljs-type">error</span>) &#123;<br>	b, err := io.ReadAll(src)<br>	<span class="hljs-keyword">if</span> err != <span class="hljs-literal">nil</span> &#123;<br>		<span class="hljs-keyword">return</span> <span class="hljs-literal">nil</span>, err<br>	&#125;<br>	src.Close()<br>	<span class="hljs-keyword">return</span> b, <span class="hljs-literal">nil</span><br>&#125;<br><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">resetBody</span><span class="hljs-params">(request *http.Request, originalBody []<span class="hljs-type">byte</span>)</span></span> &#123;<br>	request.Body = io.NopCloser(bytes.NewBuffer(originalBody))<br>	request.GetBody = <span class="hljs-function"><span class="hljs-keyword">func</span><span class="hljs-params">()</span></span> (io.ReadCloser, <span class="hljs-type">error</span>) &#123;<br>		<span class="hljs-keyword">return</span> io.NopCloser(bytes.NewBuffer(originalBody)), <span class="hljs-literal">nil</span><br>	&#125;<br>&#125;<br></code></pre></td></tr></table></figure>
+</details>
+
+<h3 id="重试总结"><a href="#重试总结" class="headerlink" title="重试总结"></a>重试总结</h3><ol>
+<li>明确好哪些情况下才能重试</li>
+<li><font color="red"> 重试只在当前层. </font> 当重试失败时，应该约定全局错误码，“no need retry” 避免及联重试</li>
+<li>一定注意<font color="red">随机化重试间隔时间</font>，避免重试波峰</li>
+</ol>
+<h1 id="架构"><a href="#架构" class="headerlink" title="架构"></a>架构</h1><h2 id="冗余架构"><a href="#冗余架构" class="headerlink" title="冗余架构"></a>冗余架构</h2><ul>
 <li>集群</li>
 <li>多机房</li>
 <li>多IDC</li>
@@ -416,11 +445,26 @@
 </ul>
 <h3 id="API网关故障转移"><a href="#API网关故障转移" class="headerlink" title="API网关故障转移"></a>API网关故障转移</h3><p>如果网关发现本地AZ不可用时，会自动故障转移，路由到其他地域的AZ解决故障。为了防止重试流量压垮异地，需要控制重试次数<br><img src="/images/api_gateway_failover.png" srcset="/img/loading.gif" lazyload alt="网关故障转移"></p>
 <h3 id="客户端故障转移"><a href="#客户端故障转移" class="headerlink" title="客户端故障转移"></a>客户端故障转移</h3><p>客户端就近访问本地网关时，如果发现本地网关不可用，可以重试异地网关解决故障。</p>
-<h3 id="自适应重试"><a href="#自适应重试" class="headerlink" title="自适应重试"></a>自适应重试</h3><h2 id="负载均衡"><a href="#负载均衡" class="headerlink" title="负载均衡"></a>负载均衡</h2><ul>
+<h3 id="自适应重试"><a href="#自适应重试" class="headerlink" title="自适应重试"></a>自适应重试</h3><p><strong>设置合理的重试窗口</strong></p>
+<h2 id="负载均衡"><a href="#负载均衡" class="headerlink" title="负载均衡"></a>负载均衡</h2><h3 id="前端负载均衡"><a href="#前端负载均衡" class="headerlink" title="前端负载均衡"></a>前端负载均衡</h3><p>这部分借鉴自《Google SRE》，主要是通过DNS和Maglev集群去实现分流, 简单来说请求先通过DNS拿到接入层外网ip, 之后发起VIP请求到Maglev节点上(VIP基于keepalive), Maglev也是4层软件负载和LVS类似,有兴趣可以看下<a target="_blank" rel="noopener" href="https://www.manjusaka.blog/posts/2020/05/22/a-simple-introduction-about-maglev/index.html">这篇文章</a><br><img src="/images/maglev.png" srcset="/img/loading.gif" lazyload alt="Google-maglev负载均衡"></p>
+<p>国内用lvs居多，大体也类似:<br><img src="/images/fe_lb.png" srcset="/img/loading.gif" lazyload alt="前端负载均衡"></p>
+<h3 id="数据中心内负载均衡"><a href="#数据中心内负载均衡" class="headerlink" title="数据中心内负载均衡"></a>数据中心内负载均衡</h3><p><strong>Subset(子集算法限制海量连接)</strong><br>在微服务架构下，服务之间不仅会有正常的rpc调用也会有探活的rpc请求，来保证实时探测下游服务是否存活。但是如果依赖的服务很多，并且又是多个集群，那么势必需要建立大量的连接(连接数&#x3D;clients*backends)，后续需要会有大量的心跳包，占用cpu资源。<br><img src="/images/google_subset.png" srcset="/img/loading.gif" lazyload alt="子集算法"></p>
+<p><strong>常见策略</strong></p>
+<ul>
 <li>轮训</li>
 <li>最少连接数(inflight)</li>
 <li>轮训加权,(成功+，失败-) + cpu使用率</li>
+<li>[the choice of two] (<a target="_blank" rel="noopener" href="https://medium.com/the-intuition-project/load-balancing-the-intuition-behind-the-power-of-two-random-choices-6de2e139ac2f">https://medium.com/the-intuition-project/load-balancing-the-intuition-behind-the-power-of-two-random-choices-6de2e139ac2f</a>)</li>
 </ul>
+<p><strong>轮训:</strong><br>理想情况下流量被平均分配之后，下游节点之间的cpu负载差异应该都不相上下，可是实际情况是节点之间的负载差异可能会很大，导致很多资源被浪费，原因如下:</p>
+<ul>
+<li>请求处理成本不一致</li>
+<li>机器资源&#x2F;配置不一致</li>
+<li>性能因素: GC<br>因此轮训在生产环境很少会使用，毕竟真实环境的请求处理成本一定是不均衡的。</li>
+</ul>
+<p><strong>最少连接数(inflight)</strong><br>统计每个连接的inflight请求数, 请求转发到请求最少的节点上。但还是存在请求处理成本的问题，虽然某些节点连接数少，但是万一有个请求成本很高，还是导致负载不均衡。</p>
+<p><strong>轮训加权</strong><br>综上两种负载均衡都是从client端出发，没有从下游负载去考虑。所以轮训加权是根据[成功&#x2F;失败] 以及 下游cpu使用率来动态控制节点权重。tips：cpu使用率是通过rpc回报的元信息中获取。</p>
+<p><strong>the choice of two</strong><br><a target="_blank" rel="noopener" href="https://github.com/go-kratos/kratos/blob/4a93aa9b8d5dca550cc60a0c51c4726f83a2e6f8/pkg/net/rpc/warden/balancer/p2c/p2c.go">B站实现</a><br>选择 backend：CPU，client：health、inflight、latency 作为指标，使用一个简单的线性方程进行打分。<br>对新启动的节点使用常量惩罚值(penalty)，以及使用探针方式最小化放量，进行预热。<br>打分比较低的节点，避免进入“永久黑名单”而无法恢复，使用统计衰减的方式，让节点指标逐渐恢复到初始状态(即默认值)。<br>指标计算结合 moving average，使用时间衰减，计算vt &#x3D; v(t-1) * β + at * (1-β) ，β为若干次幂的倒数即: Math.Exp((-span) &#x2F; 600ms)<br><img src="/images/bilibili_p2c.png" srcset="/img/loading.gif" lazyload alt="b站P2C实现"></p>
 <h2 id="分布式限流"><a href="#分布式限流" class="headerlink" title="分布式限流"></a>分布式限流</h2><ul>
 <li>即时消费即时结算</li>
 <li>先消费后结算</li>
