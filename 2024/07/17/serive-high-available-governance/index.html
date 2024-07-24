@@ -37,7 +37,7 @@
 <meta property="og:image" content="http://codingwhat.github.io/images/google_subset.png">
 <meta property="og:image" content="http://codingwhat.github.io/images/bilibili_p2c.png">
 <meta property="article:published_time" content="2024-07-17T08:41:53.000Z">
-<meta property="article:modified_time" content="2024-07-24T09:40:57.510Z">
+<meta property="article:modified_time" content="2024-07-24T09:42:05.605Z">
 <meta property="article:author" content="codingWhat">
 <meta property="article:tag" content="GO">
 <meta property="article:tag" content="可用性治理">
@@ -346,7 +346,7 @@
 <li>传统断路器，<a target="_blank" rel="noopener" href="https://github.com/afex/hystrix-go">hystrix-go</a>&#x2F;<a target="_blank" rel="noopener" href="https://github.com/alibaba/sentinel-golang/tree/master/core/circuitbreaker">sentinel-go</a></li>
 <li>自适应熔断, google sre-breaker</li>
 </ul>
-<h3 id="传统断路器"><a href="#传统断路器" class="headerlink" title="传统断路器"></a>传统断路器</h3><p><img src="/images/circuit_breaker.png" srcset="/img/loading.gif" lazyload alt="传统断路器"><br>网上介绍断路器的文章很多, 本文偏实战这里就不详细介绍了, 不过为了阅读的连贯性,我这里会挑重点介绍。<br><strong>状态机原理:</strong><br>它是一个状态机模型，通过状态切换处理故障减少对主调的影响，主要包含三种状态:打开(Open)、半打开(Half-Open)、关闭(Closed)<br><strong>状态切换</strong><br>1.初始状态下断路器状态是关闭的, Closed.<br>2.下游服务出现故障后断路器会统计对应的指标(错误率&#x2F;错误数&#x2F;慢调用)，如果超过阈值(比如错误数，这个值是用户自定义的； 也叫静默数)，则进入打开状态, Open.<br>3.之后会等待一个时间窗口(用户自定义)，进入半打开 - Half Open,<br>4-1.紧接着会放行探针、判断探针的结果 (用户自定义探针数，探针成功的比例)，<br>4-2.如果探针都成功了，说明服务恢复了，断路器进入Closed； 反之断路器继续进入Open，循环探测。</p>
+<h3 id="传统断路器"><a href="#传统断路器" class="headerlink" title="传统断路器"></a>传统断路器</h3><p><img src="/images/circuit_breaker.png" srcset="/img/loading.gif" lazyload alt="传统断路器"><br>网上介绍断路器的文章很多, 本文偏实战这里就不详细介绍了, 不过为了阅读的连贯性,我这里会挑重点介绍。<br><strong>状态机原理:</strong><br>它是一个状态机模型，通过状态切换处理故障减少对主调的影响，主要包含三种状态:打开(Open)、半打开(Half-Open)、关闭(Closed)<br><strong>状态切换</strong><br>1.初始状态下断路器状态是关闭的, Closed.<br>2.下游服务出现故障后断路器会统计对应的指标(错误率&#x2F;错误数&#x2F;慢调用)，如果超过阈值(比如错误数，这个值是用户自定义的； 也叫静默数)，则进入打开状态, Open.<br>3.之后会等待一个时间窗口(用户自定义)，进入半打开 - Half Open,<br>4.紧接着会放行探针、判断探针的结果 (用户自定义探针数，探针成功的比例)，<br>5.1.如果探针都成功了，说明服务恢复了，断路器进入Closed；<br>5.2.反之断路器继续进入Open，循环探测。</p>
 <p>综上断路器的逻辑是非常清晰明确的，每个步骤都可以自定义配置。 最后我们总结下传统breaker<br>优点: 配置齐全，支持错误率&#x2F;慢调用比例&#x2F;错误数<br>缺点: 配置项多，不好准确配值；close-&gt;open-&gt;half open 需要配置静默数、阈值、超时时间、探针数、探针成功数等。</p>
 <details>
 <summary> hystrix-go实现</summary>
