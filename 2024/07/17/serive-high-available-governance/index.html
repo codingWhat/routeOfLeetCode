@@ -16,12 +16,12 @@
   <meta name="author" content="codingWhat">
   <meta name="keywords" content="evanhan codingWhat 博客 韩伟的博客 系统设计 后端开发">
   
-    <meta name="description" content="实战篇将围绕节点、架构以及外部工具三个方面介绍，争取由点及面让读者逐步掌握这些知识，最后能反哺到日后工作当中。说明:本文内容是个人学习和实践的总结，如有错误，欢迎指正。">
+    <meta name="description" content="本文将围绕节点、架构以及外部工具三个方面介绍服务治理。通过理论结合实践的方式逐步介绍这些知识，旨在帮助读者全面掌握相关概念和技能，并能将其应用于实际工作中。本文内容是基于个人学习和实践的总结，如果有任何错误或不准确之处，欢迎指正。">
 <meta property="og:type" content="article">
-<meta property="og:title" content="服务可用性治理-实战篇">
+<meta property="og:title" content="服务可用性治理">
 <meta property="og:url" content="http://codingwhat.github.io/2024/07/17/serive-high-available-governance/index.html">
 <meta property="og:site_name" content="codingWhat Blog">
-<meta property="og:description" content="实战篇将围绕节点、架构以及外部工具三个方面介绍，争取由点及面让读者逐步掌握这些知识，最后能反哺到日后工作当中。说明:本文内容是个人学习和实践的总结，如有错误，欢迎指正。">
+<meta property="og:description" content="本文将围绕节点、架构以及外部工具三个方面介绍服务治理。通过理论结合实践的方式逐步介绍这些知识，旨在帮助读者全面掌握相关概念和技能，并能将其应用于实际工作中。本文内容是基于个人学习和实践的总结，如果有任何错误或不准确之处，欢迎指正。">
 <meta property="og:locale" content="zh_CN">
 <meta property="og:image" content="http://codingwhat.github.io/images/limiter.png">
 <meta property="og:image" content="http://codingwhat.github.io/images/circuit_breaker.png">
@@ -30,15 +30,16 @@
 <meta property="og:image" content="http://codingwhat.github.io/images/timeout_propagation.png">
 <meta property="og:image" content="http://codingwhat.github.io/images/ema.png">
 <meta property="og:image" content="http://codingwhat.github.io/images/hedging.png">
-<meta property="og:image" content="http://codingwhat.github.io/images/set_arch.png">
 <meta property="og:image" content="http://codingwhat.github.io/images/two_idc.png">
+<meta property="og:image" content="http://codingwhat.github.io/images/set_arch.png">
+<meta property="og:image" content="http://codingwhat.github.io/images/logic_set_type.png">
 <meta property="og:image" content="http://codingwhat.github.io/images/api_gateway_failover.png">
 <meta property="og:image" content="http://codingwhat.github.io/images/maglev.png">
 <meta property="og:image" content="http://codingwhat.github.io/images/fe_lb.png">
 <meta property="og:image" content="http://codingwhat.github.io/images/google_subset.png">
 <meta property="og:image" content="http://codingwhat.github.io/images/bilibili_p2c.png">
 <meta property="article:published_time" content="2024-07-17T08:41:53.000Z">
-<meta property="article:modified_time" content="2024-07-26T07:26:03.622Z">
+<meta property="article:modified_time" content="2024-07-26T08:25:13.153Z">
 <meta property="article:author" content="codingWhat">
 <meta property="article:tag" content="GO">
 <meta property="article:tag" content="可用性治理">
@@ -49,7 +50,7 @@
   
   
   
-  <title>服务可用性治理-实战篇 - codingWhat Blog</title>
+  <title>服务可用性治理 - codingWhat Blog</title>
 
   <link  rel="stylesheet" href="https://lib.baomitu.com/twitter-bootstrap/4.6.1/css/bootstrap.min.css" />
 
@@ -244,7 +245,7 @@
       <div class="banner-text text-center fade-in-up">
         <div class="h2">
           
-            <span id="subtitle" data-typed-text="服务可用性治理-实战篇"></span>
+            <span id="subtitle" data-typed-text="服务可用性治理"></span>
           
         </div>
 
@@ -267,7 +268,7 @@
       <span class="post-meta mr-2">
         <i class="iconfont icon-chart"></i>
         
-          6.1k 字
+          6.7k 字
         
       </span>
     
@@ -278,7 +279,7 @@
         
         
         
-          52 分钟
+          56 分钟
         
       </span>
     
@@ -323,13 +324,13 @@
       <div class="container nopadding-x-md" id="board-ctn">
         <div id="board">
           <article class="post-content mx-auto">
-            <h1 id="seo-header">服务可用性治理-实战篇</h1>
+            <h1 id="seo-header">服务可用性治理</h1>
             
             
               <div class="markdown-body">
                 
                 <blockquote>
-<p> 实战篇将围绕节点、架构以及外部工具三个方面介绍，争取由点及面让读者逐步掌握这些知识，最后能反哺到日后工作当中。说明:本文内容是个人学习和实践的总结，如有错误，欢迎指正。</p>
+<p> 本文将围绕节点、架构以及外部工具三个方面介绍服务治理。通过理论结合实践的方式逐步介绍这些知识，旨在帮助读者全面掌握相关概念和技能，并能将其应用于实际工作中。本文内容是基于个人学习和实践的总结，如果有任何错误或不准确之处，欢迎指正。</p>
 </blockquote>
 <span id="more"></span>
 
@@ -340,7 +341,7 @@
 <li>如果服务过载了怎么办？</li>
 </ul>
 <h2 id="限流"><a href="#限流" class="headerlink" title="限流"></a>限流</h2><p><img src="/images/limiter.png" srcset="/img/loading.gif" lazyload alt="限流模型"><br>我们知道单节点的处理能力是有限的，所以对于异常流量第一步我们要做的就是限流保护系统。限流主要有分为客户端限流、服务端限流以及分布式限流。这几种限流场景我在另一篇<a href="https://codingwhat.github.io/2024/07/09/limiter-in-action/">《限流实战》</a>做了详细分析，所以这里不再重复了。</p>
-<h2 id="熔断"><a href="#熔断" class="headerlink" title="熔断"></a>熔断</h2><p>熔断为什么能提高可用性?<br>1.当依赖服务&#x2F;组件发生故障时，断路器会打开，此时无需请求下游，业务要么降级要么fast-fail，有效的避免了资源浪费以及资源堆积引发的雪崩效应。<br>2.断路器会通过探针探测服务是否恢复，如果发现服务恢复了，会继续放行请求，提升可用性。</p>
+<h2 id="服务分级"><a href="#服务分级" class="headerlink" title="服务分级"></a>服务分级</h2><h2 id="熔断"><a href="#熔断" class="headerlink" title="熔断"></a>熔断</h2><p>熔断为什么能提高可用性?<br>1.当依赖服务&#x2F;组件发生故障时，断路器会打开，此时无需请求下游，业务要么降级要么fast-fail，有效的避免了资源浪费以及资源堆积引发的雪崩效应。<br>2.断路器会通过探针探测服务是否恢复，如果发现服务恢复了，会继续放行请求，提升可用性。</p>
 <p><strong>断路器分类</strong></p>
 <ul>
 <li>传统断路器，<a target="_blank" rel="noopener" href="https://github.com/afex/hystrix-go">hystrix-go</a>&#x2F;<a target="_blank" rel="noopener" href="https://github.com/alibaba/sentinel-golang/tree/master/core/circuitbreaker">sentinel-go</a></li>
@@ -446,9 +447,7 @@
 <li>两地三中心</li>
 <li>异地双活<br>这部分可以直接看<a target="_blank" rel="noopener" href="http://kaito-kidd.com/2021/10/15/what-is-the-multi-site-high-availability-design/">这篇文章</a>写的非常好</li>
 </ul>
-<h2 id="单元化架构"><a href="#单元化架构" class="headerlink" title="单元化架构"></a>单元化架构</h2><p>单元化架构是将系统划分成不同的业务单元，将同一单元的业务部署在一个机房，在单元内实现业务自包含。如下图服务的上下游组成独立、完整的单元并且这些服务也部署在一起，链路调用绝对不会产生跨单元调度，也不存在跨机房延时问题。<br><img src="/images/set_arch.png" srcset="/img/loading.gif" lazyload alt="单元化架构">,</p>
-<p><strong>单元架构分类</strong>这里以阿里云的介绍为例：</p>
-<p>比较常见的双中心架构:<br><img src="/images/two_idc.png" srcset="/img/loading.gif" lazyload alt="双中心架构"><br>整体架构通过GSLB将流量划分为北京和广州，覆盖接入层、服务层、存储层，形成异地”双活”(一般都是读双活，写双活成本高，一致性容易出问题) </p>
+<p>这里以双中心架构为例:<br><img src="/images/two_idc.png" srcset="/img/loading.gif" lazyload alt="双中心架构"><br>整体架构通过GSLB将流量划分为北京和广州，覆盖接入层、服务层、存储层，形成异地”双活”(一般都是读双活，写双活成本高，一致性容易出问题) </p>
 <ul>
 <li>服务层做读写分离，以上图为例, 北京(读写), 广州(读), 广州的写请求路由到北京;</li>
 <li>存储也是各自一套，以mysql为例, master节点在北京(因为北京负责写)，广州为备份节点，自动从北京master异步同步，保持最终一致。</li>
@@ -457,6 +456,9 @@
 <ul>
 <li>sgtw是我司收敛不同运营商的网关(七层流量负载均衡; 解决跨运营商访问延时大的问题)</li>
 </ul>
+<h3 id="单元化架构"><a href="#单元化架构" class="headerlink" title="单元化架构"></a>单元化架构</h3><p>单元化架构是将系统划分成不同的业务单元，将同一单元的业务部署在一个机房，在单元内实现业务自包含。如下图服务的上下游组成独立、完整的单元并且部署在一起，链路调用绝对不会产生跨单元调度，也不存在跨机房延时问题。<br><img src="/images/set_arch.png" srcset="/img/loading.gif" lazyload alt="单元化架构">,</p>
+<p><strong>单元架构分类</strong><br>这里以阿里云的介绍为例：<br>RZone（Region Zone）：部署按用户维度拆分的关键业务系统。核心业务和数据单元化拆分，拆分后分片均衡，单元内尽量自包含（调用封闭），拥有自己的数据，能完成所有业务。一个可用区可以有多个 RZone。<br>GZone（Global Zone）：部署未按用户维度拆分的系统，被 RZone 依赖，提供不可拆分的数据和服务，如配置型的业务。数据库可以和 RZone 共享，多租户隔离，全局只有一组，可以配置流量权重。<br>CZone（City Zone）：部署未按用户维度拆分的系统，被 RZone 高频访问 ，解决跨域通信延时问题。为了解决异地延迟问题而特别设计，适合读多写少且不可拆分的业务。 一般每个城市一套应用和数据，是 GZone 的快照。</p>
+<p><img src="/images/logic_set_type.png" srcset="/img/loading.gif" lazyload alt="单元化架构-单元类型"></p>
 <h2 id="自动故障转移"><a href="#自动故障转移" class="headerlink" title="自动故障转移"></a>自动故障转移</h2><ul>
 <li>API网关故障转移</li>
 <li>客户端故障转移</li>
@@ -465,7 +467,8 @@
 </ul>
 <h3 id="API网关故障转移"><a href="#API网关故障转移" class="headerlink" title="API网关故障转移"></a>API网关故障转移</h3><p>如果网关发现本地AZ不可用时，会自动故障转移，路由到其他地域的AZ解决故障。为了防止重试流量压垮异地，需要控制重试次数<br><img src="/images/api_gateway_failover.png" srcset="/img/loading.gif" lazyload alt="网关故障转移"></p>
 <h3 id="客户端故障转移"><a href="#客户端故障转移" class="headerlink" title="客户端故障转移"></a>客户端故障转移</h3><p>客户端就近访问本地网关时，如果发现本地网关不可用，可以重试异地网关解决故障。</p>
-<h3 id="自适应重试"><a href="#自适应重试" class="headerlink" title="自适应重试"></a>自适应重试</h3><p><strong>设置合理的重试窗口</strong></p>
+<h3 id="自适应重试"><a href="#自适应重试" class="headerlink" title="自适应重试"></a>自适应重试</h3><p><strong>设置合理的重试窗口</strong><br>实现思路: 依旧请求结果[成功率]来动态调整重试窗口。若成功率满足阈值，当前重试次数超过窗口，则适当增加窗口，否则保持窗口大小；若不满足成功率,窗口阈值&#x3D;max(1, num&#x2F;2)</p>
+<figure class="highlight golang"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><code class="hljs golang"><span class="hljs-keyword">type</span> RetryLimiter <span class="hljs-keyword">struct</span> &#123;<br>	RetryMaxNum <span class="hljs-type">int</span> <span class="hljs-comment">//重试窗口</span><br>&#125;<br><br><span class="hljs-comment">// GetRetryQuota 获取可以请求下游重试配额</span><br><span class="hljs-comment">// succRate 采样窗统计最近成功率，比如最近5s</span><br><span class="hljs-comment">// retryProbeNum: 重试次数</span><br><span class="hljs-comment">// reqIdx: 本地请求总次数</span><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(l *RetryLimiter)</span></span> GetRetryQuota(succRate <span class="hljs-type">float64</span>, retryProbeNum <span class="hljs-type">int</span>, reqIdx <span class="hljs-type">int</span>) <span class="hljs-type">int</span> &#123;<br>	<span class="hljs-keyword">if</span> succRate &gt; <span class="hljs-number">0.9</span> &#123;<br>		<span class="hljs-keyword">if</span> retryProbeNum &gt;= l.RetryMaxNum &#123;<br>			<span class="hljs-comment">// 取当前请求流量1%作为增量，同时min函数确保窗口调整的增量不超过当前窗口大小，保持调整的平稳性</span><br>			l.RetryMaxNum = l.RetryMaxNum + max(min(<span class="hljs-number">1</span>*reqIdx/<span class="hljs-number">100</span>, retryProbeNum), <span class="hljs-number">1</span>)<br>		&#125;<br>	&#125; <span class="hljs-keyword">else</span> &#123;<br>		l.RetryMaxNum = max(<span class="hljs-number">1</span>, l.RetryMaxNum/<span class="hljs-number">2</span>)<br>	&#125;<br>	<span class="hljs-keyword">return</span> l.RetryMaxNum<br>&#125;<br><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">min</span><span class="hljs-params">(a, b <span class="hljs-type">int</span>)</span></span> <span class="hljs-type">int</span> &#123;<br>	<span class="hljs-keyword">if</span> a &lt; b &#123;<br>		<span class="hljs-keyword">return</span> a<br>	&#125;<br>	<span class="hljs-keyword">return</span> b<br>&#125;<br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">max</span><span class="hljs-params">(a, b <span class="hljs-type">int</span>)</span></span> <span class="hljs-type">int</span> &#123;<br>	<span class="hljs-keyword">if</span> a &gt; b &#123;<br>		<span class="hljs-keyword">return</span> a<br>	&#125;<br>	<span class="hljs-keyword">return</span> b<br>&#125;<br></code></pre></td></tr></table></figure>
 <h2 id="负载均衡"><a href="#负载均衡" class="headerlink" title="负载均衡"></a>负载均衡</h2><h3 id="前端负载均衡"><a href="#前端负载均衡" class="headerlink" title="前端负载均衡"></a>前端负载均衡</h3><p>这部分借鉴自《Google SRE》，主要是通过DNS和Maglev集群去实现分流, 简单来说请求先通过DNS拿到接入层外网ip, 之后发起VIP请求到Maglev节点上(VIP基于keepalive), Maglev也是4层软件负载和LVS类似,有兴趣可以看下<a target="_blank" rel="noopener" href="https://www.manjusaka.blog/posts/2020/05/22/a-simple-introduction-about-maglev/index.html">这篇文章</a><br><img src="/images/maglev.png" srcset="/img/loading.gif" lazyload alt="Google-maglev负载均衡"></p>
 <p>国内用lvs居多，大体也类似:<br><img src="/images/fe_lb.png" srcset="/img/loading.gif" lazyload alt="前端负载均衡"></p>
 <h3 id="数据中心内负载均衡"><a href="#数据中心内负载均衡" class="headerlink" title="数据中心内负载均衡"></a>数据中心内负载均衡</h3><p><strong>Subset(子集算法限制海量连接)</strong><br>在微服务架构下，服务之间不仅会有“正常的”rpc调用，也会有心跳请求探测依赖服务的存活。问题来了假设当前服务依赖的下游服务很多，并且如果下游又是冗余了多个集群，那么势必需要建立大量的tcp连接(连接数&#x3D;clients*backends)，再加上后续需要会有大量的心跳包，占用了大量cpu资源，面对海量连接client该如何处理?<br><img src="/images/google_subset.png" srcset="/img/loading.gif" lazyload alt="子集算法"></p>
@@ -483,7 +486,7 @@
 <li>性能因素: GC<br>因此轮训在生产环境很少会使用，毕竟真实环境的请求处理成本一定是不均衡的。</li>
 </ul>
 <p><strong>最少连接数(inflight)</strong><br>统计每个连接的inflight请求数, 请求转发到请求最少的节点上。但还是存在请求处理成本的问题，虽然某些节点连接数少，但是万一有个请求成本很高，还是导致负载不均衡。</p>
-<p><strong>轮训加权</strong><br>以上两种负载均衡都是从client端出发，没有从下游负载去考虑，导致下游负载不均。所以轮训加权的实现思路是依据请求<strong>响应结果[成功&#x2F;失败]</strong>以及下游服务<strong>cpu使用率</strong>来动态控制节点权重(cpu使用率是通过rpc回报的元信息中获取)。</p>
+<p><strong>轮训加权</strong><br>以上两种负载均衡都是从client端出发，没有从下游负载去考虑，导致下游负载不均。所以轮训加权的实现思路是依据请求<strong>响应结果</strong>[成功&#x2F;失败]以及下游服务<strong>cpu使用率</strong>来动态控制节点权重(cpu使用率是通过rpc回报的元信息中获取)。</p>
 <p><strong>the choice of two  <a target="_blank" rel="noopener" href="https://github.com/go-kratos/kratos/blob/4a93aa9b8d5dca550cc60a0c51c4726f83a2e6f8/pkg/net/rpc/warden/balancer/p2c/p2c.go">B站实现</a></strong><br>选择 backend：CPU，client：health、inflight、latency 作为指标，使用一个简单的线性方程进行打分。<br>对新启动的节点使用常量惩罚值(penalty)，以及使用探针方式最小化放量，进行预热。<br>打分比较低的节点，避免进入“永久黑名单”而无法恢复，使用统计衰减的方式，让节点指标逐渐恢复到初始状态(即默认值)。指标计算结合 moving average，使用时间衰减，计算vt &#x3D; v(t-1) * β + at * (1-β) ，β为若干次幂的倒数即: Math.Exp((-span) &#x2F; 600ms)<br><img src="/images/bilibili_p2c.png" srcset="/img/loading.gif" lazyload alt="b站P2C实现"></p>
 <h2 id="分布式限流"><a href="#分布式限流" class="headerlink" title="分布式限流"></a>分布式限流</h2><ul>
 <li>即时消费即时结算</li>
@@ -527,10 +530,10 @@
 <li>热点监控</li>
 </ul>
 <h3 id="集群隔离"><a href="#集群隔离" class="headerlink" title="集群隔离"></a>集群隔离</h3><p>每个服务部署独立的集群</p>
-<h1 id="外部工具"><a href="#外部工具" class="headerlink" title="外部工具"></a>外部工具</h1><ul>
-<li>混沌工程，通过注入cpu高负载、网络超时等问题，主动找出系统中脆弱环节</li>
-<li>全链路压测，生产环境模拟真实用户压测。提前发现隐藏问题。压测过程： 压测流量构建-&gt; 流量染色-&gt; 流量隔离, 影子库(redis&#x2F;mysql) -&gt; 可视化监控</li>
-</ul>
+<h1 id="外部工具"><a href="#外部工具" class="headerlink" title="外部工具"></a>外部工具</h1><h2 id="混沌工程"><a href="#混沌工程" class="headerlink" title="混沌工程"></a>混沌工程</h2><p>通过注入cpu高负载、网络超时等问题，主动找出系统中脆弱环节</p>
+<h2 id="全链路压测"><a href="#全链路压测" class="headerlink" title="全链路压测"></a>全链路压测</h2><p>生产环境模拟真实用户压测, 提前发现隐藏问题。<br>压测过程：压测流量构建 -&gt; 流量染色(隔离, 影子库(redis&#x2F;mysql)) -&gt; 压测引擎启动  -&gt; 可视化监控</p>
+<p>如果你司没有自研平台，也可以用云厂商提供的。<br><strong>故障演练</strong><br><a target="_blank" rel="noopener" href="https://cloud.tencent.com/product/cfg">腾讯云混沌工程</a><br><a target="_blank" rel="noopener" href="https://www.aliyun.com/product/aliware/ahas/chaos?spm=5176.21213303.J_qCOwPWspKEuWcmp8qiZNQ.17.7da82f3dazso4O&scm=20140722.S_product@@%E4%BA%91%E4%BA%A7%E5%93%81@@1157223._.ID_product@@%E4%BA%91%E4%BA%A7%E5%93%81@@1157223-RL_%E6%B7%B7%E6%B2%8C%E5%B7%A5%E7%A8%8B-LOC_llm-OR_ser-V_3-RE_new4@@cardOld-P0_1">阿里云Chaos</a></p>
+<p><strong>全链路压测</strong><br><a target="_blank" rel="noopener" href="https://cloud.tencent.com/product/pts">腾讯云-PTS</a><br><a target="_blank" rel="noopener" href="https://www.aliyun.com/product/pts?spm=5176.21213303.J_qCOwPWspKEuWcmp8qiZNQ.20.13fc2f3dkx6uFr&scm=20140722.S_card@@%E4%BA%A7%E5%93%81@@596788.S_card0.ID_card@@%E4%BA%A7%E5%93%81@@596788-RL_%E5%85%A8%E9%93%BE%E8%B7%AF%E5%8E%8B%E6%B5%8B-LOC_search~UND~card~UND~item-OR_ser-V_3-RE_cardOld-P0_0">阿里云-PTS</a></p>
 
                 
               </div>
@@ -561,7 +564,7 @@
 
   <div class="license-box my-3">
     <div class="license-title">
-      <div>服务可用性治理-实战篇</div>
+      <div>服务可用性治理</div>
       <div>http://codingwhat.github.io/2024/07/17/serive-high-available-governance/</div>
     </div>
     <div class="license-meta">
