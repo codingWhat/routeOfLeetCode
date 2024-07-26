@@ -38,7 +38,7 @@
 <meta property="og:image" content="http://codingwhat.github.io/images/google_subset.png">
 <meta property="og:image" content="http://codingwhat.github.io/images/bilibili_p2c.png">
 <meta property="article:published_time" content="2024-07-17T08:41:53.000Z">
-<meta property="article:modified_time" content="2024-07-26T07:19:13.312Z">
+<meta property="article:modified_time" content="2024-07-26T07:26:03.622Z">
 <meta property="article:author" content="codingWhat">
 <meta property="article:tag" content="GO">
 <meta property="article:tag" content="可用性治理">
@@ -278,7 +278,7 @@
         
         
         
-          51 分钟
+          52 分钟
         
       </span>
     
@@ -483,7 +483,7 @@
 <li>性能因素: GC<br>因此轮训在生产环境很少会使用，毕竟真实环境的请求处理成本一定是不均衡的。</li>
 </ul>
 <p><strong>最少连接数(inflight)</strong><br>统计每个连接的inflight请求数, 请求转发到请求最少的节点上。但还是存在请求处理成本的问题，虽然某些节点连接数少，但是万一有个请求成本很高，还是导致负载不均衡。</p>
-<p><strong>轮训加权</strong><br>以上两种负载均衡都是从client端出发，没有从下游负载去考虑。所以轮训加权是根据[成功&#x2F;失败] 以及 下游cpu使用率来动态控制节点权重。tips：cpu使用率是通过rpc回报的元信息中获取。</p>
+<p><strong>轮训加权</strong><br>以上两种负载均衡都是从client端出发，没有从下游负载去考虑，导致下游负载不均。所以轮训加权的实现思路是依据请求<strong>响应结果[成功&#x2F;失败]</strong>以及下游服务<strong>cpu使用率</strong>来动态控制节点权重(cpu使用率是通过rpc回报的元信息中获取)。</p>
 <p><strong>the choice of two  <a target="_blank" rel="noopener" href="https://github.com/go-kratos/kratos/blob/4a93aa9b8d5dca550cc60a0c51c4726f83a2e6f8/pkg/net/rpc/warden/balancer/p2c/p2c.go">B站实现</a></strong><br>选择 backend：CPU，client：health、inflight、latency 作为指标，使用一个简单的线性方程进行打分。<br>对新启动的节点使用常量惩罚值(penalty)，以及使用探针方式最小化放量，进行预热。<br>打分比较低的节点，避免进入“永久黑名单”而无法恢复，使用统计衰减的方式，让节点指标逐渐恢复到初始状态(即默认值)。指标计算结合 moving average，使用时间衰减，计算vt &#x3D; v(t-1) * β + at * (1-β) ，β为若干次幂的倒数即: Math.Exp((-span) &#x2F; 600ms)<br><img src="/images/bilibili_p2c.png" srcset="/img/loading.gif" lazyload alt="b站P2C实现"></p>
 <h2 id="分布式限流"><a href="#分布式限流" class="headerlink" title="分布式限流"></a>分布式限流</h2><ul>
 <li>即时消费即时结算</li>
