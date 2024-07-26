@@ -37,7 +37,7 @@
 <meta property="og:image" content="http://codingwhat.github.io/images/google_subset.png">
 <meta property="og:image" content="http://codingwhat.github.io/images/bilibili_p2c.png">
 <meta property="article:published_time" content="2024-07-17T08:41:53.000Z">
-<meta property="article:modified_time" content="2024-07-26T06:55:02.670Z">
+<meta property="article:modified_time" content="2024-07-26T07:01:15.417Z">
 <meta property="article:author" content="codingWhat">
 <meta property="article:tag" content="GO">
 <meta property="article:tag" content="可用性治理">
@@ -357,7 +357,7 @@
 </details>
 
 <h3 id="自适应断路器"><a href="#自适应断路器" class="headerlink" title="自适应断路器"></a>自适应断路器</h3><p><strong>google sre-breaker</strong> 出自书籍《Google SRE》中Handling Overload节</p>
-<p><img src="/images/sre_breaker.png" srcset="/img/loading.gif" lazyload alt="谷歌自适应断路器-核心算法"><br>传统断路器在Open阶段有固定的等待窗口，此时不会放行任何请求，那如果后端未shutdown是否可以放行少量探针尽快探活呢？GoogleSRE提供了一个解决方案-自适应客户端限流，实现思路就是通过滑动窗口统计成功请求数来限制对下游异常服务的请求数。在Open阶段利用采用上图算法决策是否放行探针，较传统方式能更快的感知到下游服务的恢复情况</p>
+<p><img src="/images/sre_breaker.png" srcset="/img/loading.gif" lazyload alt="谷歌自适应断路器-核心算法"><br>传统断路器在Open阶段有固定的等待窗口，此时不会放行任何请求，以此来保障服务的稳定性，不过在短暂抖动的场景下，这种策略反而会降低服务的可用性(比如等待窗口10s, 可是服务3s就恢复了，还得等待7s才会进入half-open), GoogleSRE提供了一个解决方案-自适应客户端限流，实现思路就是通过滑动窗口统计成功请求数来限制对下游异常服务的请求数。在Open阶段利用采用上图算法决策是否放行探针，较传统方式能更快的感知到下游服务的恢复情况</p>
 <p>算法: f(x) &#x3D; max(0, (requests - K * accepts)&#x2F;(requests+1))</p>
 <p><strong>算法剖析：</strong><br>初始状态: requests &#x3D;&#x3D; accepts,假设K&#x3D;0.5,<br>无故障时: f(x) &gt;  0, 当故障开始时, requests变大, accepts保持不变, f(x)一直 &gt; 0<br>假设K&#x3D;1<br>无故障时: f(x) &#x3D;&#x3D; 0, 当故障开始时, requests变大, accepts保持不变，当requests &gt; 1 * accepts时 f(x) &gt; 0<br>假设K&#x3D;2<br>无故障时: f(x) &#x3D;&#x3D; 0, 当故障开始时, requests变大, accepts保持不变, 当requests &gt; 2 * accepts时, f(x) &gt; 0</p>
 <p>综上，K是调节熔断刚性的因子，当K&gt;&#x3D;1,偏柔性，比如K&#x3D;1, 此时相当于能容忍accepts个请求通过，当K&lt;1, 则偏刚性，直接拒绝了。</p>
