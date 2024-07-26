@@ -24,7 +24,7 @@
 <meta property="og:description" content="作为服务提供者即便可以做不同规模的容量模型，但是面对未知的外部流量不可能做到准确预测的，为了应对海量流量的冲击，服务必须得采取自保护策略，丢弃掉部分流量来保障服务的稳定性。">
 <meta property="og:locale" content="zh_CN">
 <meta property="article:published_time" content="2024-07-09T09:42:14.000Z">
-<meta property="article:modified_time" content="2024-07-22T09:46:23.398Z">
+<meta property="article:modified_time" content="2024-07-26T09:57:38.604Z">
 <meta property="article:author" content="codingWhat">
 <meta property="article:tag" content="GO">
 <meta property="article:tag" content="可用性治理">
@@ -253,7 +253,7 @@
       <span class="post-meta mr-2">
         <i class="iconfont icon-chart"></i>
         
-          1.3k 字
+          1.4k 字
         
       </span>
     
@@ -264,7 +264,7 @@
         
         
         
-          11 分钟
+          12 分钟
         
       </span>
     
@@ -326,42 +326,25 @@
 <li>固定窗口, 实现简单; 不精准，存在边界问题</li>
 </ul>
 <p>共性:<br>优点: 实现简单<br>缺点:<br>1.基于QPS限流静态限流, 无法根据服务的负载动态限流<br>2.限流阈值不好配置(请求的处理成本不一致)<br>3.节点扩缩, 需要重新设置</p>
-<h3 id="动态限流-推荐"><a href="#动态限流-推荐" class="headerlink" title="动态限流[推荐]"></a>动态限流[推荐]</h3><ul>
-<li><p><a target="_blank" rel="noopener" href="https://github.com/go-kratos/aegis/tree/main/ratelimit/bbr">B站-BBR</a></p>
-</li>
-<li><p><a target="_blank" rel="noopener" href="https://github.com/alibaba/sentinel-golang/wiki/%E7%B3%BB%E7%BB%9F%E8%87%AA%E9%80%82%E5%BA%94%E6%B5%81%E6%8E%A7">sentinel-go</a></p>
-</li>
-<li><p>Co-DEL，采用队列去管理请求，超时请求就自动被拒绝。看B站的实现有个点就是，会有2个容忍窗口的逻辑: 容忍窗口期间请求还是会被放行, 超过窗口的再被拒绝。</p>
-</li>
-<li><p>优点: 服务自适应限流限流；在静态限流的基础上，通过当前实例的负载情况(采样窗口内的cpu使用率&#x2F;load1)进行动态设置限流阈值，让服务保持高水位高效运行。</p>
-</li>
-<li><p>缺点: 实现复杂</p>
-</li>
-<li><p><a target="_blank" rel="noopener" href="https://github.com/go-kratos/aegis/tree/main/ratelimit/bbr">B站-BBR</a></p>
-</li>
-<li><p><a target="_blank" rel="noopener" href="https://github.com/alibaba/sentinel-golang/wiki/%E7%B3%BB%E7%BB%9F%E8%87%AA%E9%80%82%E5%BA%94%E6%B5%81%E6%8E%A7">sentinel-go</a></p>
-</li>
-<li><p>Co-DEL，采用队列去管理请求，超时请求就自动被拒绝。B站的实现有2个容忍窗口, 容忍窗口期间请求还是会被放行, 超过窗口的才会被拒绝。</p>
-</li>
-</ul>
-<p>b站-BBR, 主要依赖以下两个指标:</p>
+<h3 id="动态限流-推荐"><a href="#动态限流-推荐" class="headerlink" title="动态限流[推荐]"></a>动态限流[推荐]</h3><p>通过实例的负载情况(采样窗口内的cpu使用率&#x2F;load1)进行动态设置限流阈值，让服务保持高水位高效运行。</p>
+<p><strong>开源实现:</strong><br><a target="_blank" rel="noopener" href="https://github.com/go-kratos/aegis/tree/main/ratelimit/bbr">B站-BBR</a><br><a target="_blank" rel="noopener" href="https://github.com/alibaba/sentinel-golang/wiki/%E7%B3%BB%E7%BB%9F%E8%87%AA%E9%80%82%E5%BA%94%E6%B5%81%E6%8E%A7">sentinel-go</a><br><a target="_blank" rel="noopener" href="https://queue.acm.org/appendices/codel.html">Co-DEL</a></p>
+<p><strong>实现原理:</strong><br>1.B站-BBR: 使用滑动窗口统计成功数、响应时间；通过滑窗计算平均响应时间，根据利特尔法则计算QPS，当CPU使用率满足阈值时，动态设置限流阈值。<br><code>QPS = (MaxPass(窗口内最大成功请求数) * MinRt(平均响应延时:ms) * BucketsPerSecond(1s的桶个数) /1000.0)</code></p>
+<p>2.Sentinel-go: 原理和B站类似，不过使用时load1(实时性较较差, 1分钟内的负载)</p>
+<p>3.Co-DEL: 传统FIFO在海量请求场景下会出现大量请求“饿死”的情况, 而codel很好的规避了这个问题，codel会清理超时请求并且自动拒绝。<a target="_blank" rel="noopener" href="https://github.com/LyricTian/kratos/blob/bd2d576848f44f7bf4eb7c9420b36093fa4f8ef7/pkg/container/queue/aqm/codel.go">B站的实现</a>有2个容忍窗口, 容忍窗口期间请求还是会被放行, 超过窗口的才会被拒绝。</p>
+<h3 id="服务分级"><a href="#服务分级" class="headerlink" title="服务分级"></a>服务分级</h3><p>在对服务进行限流时，可以引入更细的粒度-<strong>Criticality</strong>来分级限流,</p>
 <ul>
-<li>CPU使用率</li>
-<li>MaxInflight(1s的最大吞吐) &#x3D; (MaxPass(窗口内最大成功请求数) * MinRt(平均响应延时:ms) * BucketsPerSecond(1s的桶个数) &#x2F;1000.0)</li>
+<li>CRITICAL_PLUS, 最高优先级，影响面:用户可见，严重；容量设置需充足</li>
+<li>CRITICAL, 次优先级，影响面:用户可见，不如Plus严重；容量设置需充足</li>
+<li>SHEDDABLE_PLUS, 异步任务，可定期重试</li>
+<li>SHEDDABLE，最低优先级，接受不可用</li>
 </ul>
-<p>tips: math.Floor(MaxInflight + 0.5) 做了四舍五入</p>
-<p>sentinel-go:</p>
-<ul>
-<li>load1 (实时性较较差, 1分钟内的负载)</li>
-<li>MaxInflight(1s的最大吞吐) 如上</li>
-</ul>
-<p>优点:<br>1.精确限流<br>2.动态调整阈值, 和服务负载正相关</p>
-<p>缺点:<br>实现复杂，需要额外统计CPU使用率、QPS吞吐</p>
-<h3 id="限流注意事项"><a href="#限流注意事项" class="headerlink" title="限流注意事项"></a>限流注意事项</h3><ul>
+<p>Criticality 应该在服务调用链中逐级传递下去。</p>
+<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h3><ul>
+<li>精确限流, 动态调整阈值, 和服务负载正相关; 但是实现复杂，需要额外资源统计CPU使用率、QPS吞吐等</li>
 <li>请求分优先级(用户纬度)，可按优先级丢弃、可以存在一定超卖。</li>
 <li>拒绝请求也需要成本, cliet端需要截流(直接往上抛或者重试其他节点)</li>
 </ul>
-<h2 id="client端限流"><a href="#client端限流" class="headerlink" title="client端限流"></a>client端限流</h2><p>主要有以下两种场景<br>1.用户客户端疯狂重试；客户端需要随机退避重试<br>2.下游(被调)过载; 主调需要截流, 通常采用fast-fail 或者 重试其他节点。</p>
+<h2 id="客户端节流"><a href="#客户端节流" class="headerlink" title="客户端节流"></a>客户端节流</h2><p>主要有以下两种场景<br>1.用户客户端疯狂重试；客户端需要随机退避重试<br>2.下游(被调)过载; 主调需要截流, 通常采用fast-fail 或者 重试其他节点。</p>
 <h2 id="动手实践"><a href="#动手实践" class="headerlink" title="动手实践"></a>动手实践</h2><h3 id="令牌桶-核心逻辑源自标准库的rate包"><a href="#令牌桶-核心逻辑源自标准库的rate包" class="headerlink" title="令牌桶, 核心逻辑源自标准库的rate包"></a>令牌桶, 核心逻辑源自标准库的rate包</h3><figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-keyword">type</span> TokenBucket <span class="hljs-keyword">struct</span> &#123;<br>	rate       <span class="hljs-type">float64</span>    <span class="hljs-comment">// 令牌添加到桶中的速率。</span><br>	burst      <span class="hljs-type">int</span>        <span class="hljs-comment">// 桶的最大容量。</span><br>	tokens     <span class="hljs-type">float64</span>    <span class="hljs-comment">// 当前桶中的令牌数量。</span><br>	lastUpdate time.Time  <span class="hljs-comment">// 上次更新令牌数量的时间。</span><br>	mu         sync.Mutex <span class="hljs-comment">// 互斥锁，确保线程安全。</span><br>&#125;<br><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(tb *TokenBucket)</span></span> tokensFromDuration(d time.Duration) <span class="hljs-type">float64</span> &#123;<br>	<span class="hljs-comment">// Split the integer and fractional parts ourself to minimize rounding errors.</span><br>	<span class="hljs-comment">// See golang.org/issues/34861.</span><br>	sec := <span class="hljs-type">float64</span>(d/time.Second) * tb.rate<br>	nsec := <span class="hljs-type">float64</span>(d%time.Second) * tb.rate<br>	<span class="hljs-keyword">return</span> sec + nsec/<span class="hljs-number">1e9</span><br>&#125;<br><br><span class="hljs-comment">// NewTokenBucket 创建一个新的令牌桶，给定令牌添加速率和桶的容量。</span><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">NewTokenBucket</span><span class="hljs-params">(rate <span class="hljs-type">float64</span>, b <span class="hljs-type">int</span>)</span></span> *TokenBucket &#123;<br>	<span class="hljs-keyword">return</span> &amp;TokenBucket&#123;<br>		rate:   rate,<br>		burst:  b,<br>		tokens: <span class="hljs-number">0</span>,<br>	&#125;<br>&#125;<br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(tb *TokenBucket)</span></span> durationFromTokens(tokens <span class="hljs-type">float64</span>) time.Duration &#123;<br>	seconds := tokens / tb.rate<br>	<span class="hljs-keyword">return</span> time.Nanosecond * time.Duration(<span class="hljs-number">1e9</span>*seconds)<br>&#125;<br><br><span class="hljs-comment">// Allow 检查是否可以从桶中取出一个令牌。如果可以，它取出一个令牌并返回 true。</span><br><span class="hljs-comment">// 如果不可以，它返回 false。</span><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-params">(tb *TokenBucket)</span></span> Allow() <span class="hljs-type">bool</span> &#123;<br>	tb.mu.Lock()<br>	<span class="hljs-keyword">defer</span> tb.mu.Unlock()<br><br>	now := time.Now()<br>	<span class="hljs-comment">// 计算（可生成令牌数)所需要的时间，burst令牌桶容量，tokens: 当前存在的令牌个数</span><br>	maxElapsed := tb.durationFromTokens(<span class="hljs-type">float64</span>(tb.burst) - tb.tokens)<br>	elapsed := now.Sub(tb.lastUpdate)<br>	<span class="hljs-keyword">if</span> elapsed &gt; maxElapsed &#123;<br>		elapsed = maxElapsed<br>	&#125;<br><br>	<span class="hljs-comment">// 计算生成的令牌</span><br>	delta := tb.tokensFromDuration(elapsed)<br>	tokens := tb.tokens + delta<br>	<span class="hljs-keyword">if</span> burst := <span class="hljs-type">float64</span>(tb.burst); tokens &gt; burst &#123;<br>		tokens = burst<br>	&#125;<br>	tokens--<br>	<span class="hljs-keyword">var</span> waitDuration time.Duration<br>	<span class="hljs-keyword">if</span> tokens &lt; <span class="hljs-number">0</span> &#123;<br>		<span class="hljs-comment">//说明取不到1个token, 那就计算取到1个token所需要的等待时间</span><br>		waitDuration = tb.durationFromTokens(-tokens)<br>	&#125;<br>	ok := <span class="hljs-number">1</span> &lt;= tb.burst &amp;&amp; waitDuration &lt;= <span class="hljs-number">0</span><br>	<span class="hljs-keyword">if</span> ok &#123;<br>		tb.lastUpdate = now<br>		tb.tokens = tokens<br>	&#125;<br>	<span class="hljs-keyword">return</span> ok<br>&#125;<br><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">main</span><span class="hljs-params">()</span></span> &#123;<br>	tokenBucket := NewTokenBucket(<span class="hljs-number">2.0</span>, <span class="hljs-number">1.0</span>)<br><br>    succ := <span class="hljs-number">0</span><br>	reject := <span class="hljs-number">0</span><br>	<span class="hljs-keyword">for</span> i := <span class="hljs-number">1</span>; i &lt;= <span class="hljs-number">30</span>; i++ &#123;<br>		now := time.Now().Format(<span class="hljs-string">&quot;15:04:05&quot;</span>)<br>		<span class="hljs-keyword">if</span> tokenBucket.Allow() &#123;<br>			succ++<br>			<span class="hljs-comment">//fmt.Printf(now+&quot;  第 %d 个请求通过\n&quot;, i)</span><br>		&#125; <span class="hljs-keyword">else</span> &#123; <span class="hljs-comment">// 如果不能移除一个令牌，请求被拒绝。</span><br>			reject++<br>			<span class="hljs-comment">//fmt.Printf(now+&quot;  第 %d 个请求被限流\n&quot;, i)</span><br>		&#125;<br>		time.Sleep(<span class="hljs-number">100</span> * time.Millisecond) <br>	&#125;<br>	fmt.Println(succ, <span class="hljs-string">&quot;===&gt;&quot;</span>, reject)<br>&#125;<br></code></pre></td></tr></table></figure>
 <p>注意:</p>
 <ol>
