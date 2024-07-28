@@ -16,12 +16,12 @@
   <meta name="author" content="codingWhat">
   <meta name="keywords" content="evanhan codingWhat 博客 韩伟的博客 系统设计 后端开发">
   
-    <meta name="description" content="本文将围绕节点、架构以及外部工具三个方面介绍服务治理。通过理论结合实践的方式逐步介绍这些知识，旨在帮助读者全面掌握相关概念和技能，并能将其应用于实际工作中。本文内容是基于个人学习和实践的总结，如果有任何错误或不准确之处，欢迎指正。">
+    <meta name="description" content="本文将围绕节点、架构以及外部工具三个方面介绍服务治理。通过理论结合实践的方式逐步介绍这些知识，帮助读者全面掌握相关概念和技能，并能将其应用于实际工作中。本文内容是基于个人学习和实践的总结，如果有任何错误或不准确之处，欢迎指正。">
 <meta property="og:type" content="article">
 <meta property="og:title" content="服务可用性治理">
 <meta property="og:url" content="http://codingwhat.github.io/2024/07/17/serive-high-available-governance/index.html">
 <meta property="og:site_name" content="codingWhat Blog">
-<meta property="og:description" content="本文将围绕节点、架构以及外部工具三个方面介绍服务治理。通过理论结合实践的方式逐步介绍这些知识，旨在帮助读者全面掌握相关概念和技能，并能将其应用于实际工作中。本文内容是基于个人学习和实践的总结，如果有任何错误或不准确之处，欢迎指正。">
+<meta property="og:description" content="本文将围绕节点、架构以及外部工具三个方面介绍服务治理。通过理论结合实践的方式逐步介绍这些知识，帮助读者全面掌握相关概念和技能，并能将其应用于实际工作中。本文内容是基于个人学习和实践的总结，如果有任何错误或不准确之处，欢迎指正。">
 <meta property="og:locale" content="zh_CN">
 <meta property="og:image" content="http://codingwhat.github.io/images/limiter.png">
 <meta property="og:image" content="http://codingwhat.github.io/images/circuit_breaker.png">
@@ -37,9 +37,10 @@
 <meta property="og:image" content="http://codingwhat.github.io/images/maglev.png">
 <meta property="og:image" content="http://codingwhat.github.io/images/fe_lb.png">
 <meta property="og:image" content="http://codingwhat.github.io/images/google_subset.png">
-<meta property="og:image" content="http://codingwhat.github.io/images/bilibili_p2c.png">
+<meta property="og:image" content="http://codingwhat.github.io/images/two_of_random_choices.png">
+<meta property="og:image" content="http://codingwhat.github.io/images/two_of_random_choices_algo.png">
 <meta property="article:published_time" content="2024-07-17T08:41:53.000Z">
-<meta property="article:modified_time" content="2024-07-26T09:00:33.690Z">
+<meta property="article:modified_time" content="2024-07-28T07:55:00.375Z">
 <meta property="article:author" content="codingWhat">
 <meta property="article:tag" content="GO">
 <meta property="article:tag" content="可用性治理">
@@ -330,7 +331,7 @@
               <div class="markdown-body">
                 
                 <blockquote>
-<p> 本文将围绕节点、架构以及外部工具三个方面介绍服务治理。通过理论结合实践的方式逐步介绍这些知识，旨在帮助读者全面掌握相关概念和技能，并能将其应用于实际工作中。本文内容是基于个人学习和实践的总结，如果有任何错误或不准确之处，欢迎指正。</p>
+<p> 本文将围绕节点、架构以及外部工具三个方面介绍服务治理。通过理论结合实践的方式逐步介绍这些知识，帮助读者全面掌握相关概念和技能，并能将其应用于实际工作中。本文内容是基于个人学习和实践的总结，如果有任何错误或不准确之处，欢迎指正。</p>
 </blockquote>
 <span id="more"></span>
 
@@ -359,8 +360,7 @@
 </details>
 
 <h3 id="自适应断路器"><a href="#自适应断路器" class="headerlink" title="自适应断路器"></a>自适应断路器</h3><p><strong>google sre-breaker</strong> 出自书籍《Google SRE》中Handling Overload节</p>
-<p><img src="/images/sre_breaker.png" srcset="/img/loading.gif" lazyload alt="谷歌自适应断路器-核心算法"><br>传统断路器在Open阶段有固定的等待窗口，此时不会放行任何请求，以此来保障服务的稳定性，不过在短暂抖动的场景下，这种策略反而会降低服务的可用性(比如等待窗口10s, 可是服务3s就恢复了，还得等待7s才会进入half-open), GoogleSRE提供了一个解决方案-自适应客户端限流，实现思路就是通过滑动窗口统计成功请求数来限制对下游异常服务的请求数。在Open阶段利用采用上图算法决策是否放行探针，较传统方式能更快的感知到下游服务的恢复情况</p>
-<p>算法: f(x) &#x3D; max(0, (requests - K * accepts)&#x2F;(requests+1))</p>
+<p><img src="/images/sre_breaker.png" srcset="/img/loading.gif" lazyload alt="谷歌自适应断路器-核心算法"><br>传统断路器在Open状态时有固定的等待窗口，窗口内会拒绝所有请求，以此来保障服务的稳定性，不过在短暂抖动的场景下，这种策略反而会降低服务的可用性(比如等待窗口10s, 可是服务3s就恢复了，还得等待7s才会进入half-open), GoogleSRE提供了一个解决方案-自适应客户端限流，通过滑窗口统计成功请求数、请求总数采用上图算法决策是否放行探针，较传统方式能更快的感知到下游服务的恢复情况<br>算法: f(x) &#x3D; max(0, (requests - K * accepts)&#x2F;(requests+1))</p>
 <p><strong>算法剖析：</strong><br>初始状态: requests &#x3D;&#x3D; accepts,假设K&#x3D;0.5,<br>无故障时: f(x) &gt;  0, 当故障开始时, requests变大, accepts保持不变, f(x)一直 &gt; 0<br>假设K&#x3D;1<br>无故障时: f(x) &#x3D;&#x3D; 0, 当故障开始时, requests变大, accepts保持不变，当requests &gt; 1 * accepts时 f(x) &gt; 0<br>假设K&#x3D;2<br>无故障时: f(x) &#x3D;&#x3D; 0, 当故障开始时, requests变大, accepts保持不变, 当requests &gt; 2 * accepts时, f(x) &gt; 0</p>
 <p>综上，K是调节熔断刚性的因子，当K&gt;&#x3D;1,偏柔性，比如K&#x3D;1, 此时相当于能容忍accepts个请求通过，当K&lt;1, 则偏刚性，直接拒绝了。</p>
 <p><strong>总结:</strong></p>
@@ -486,12 +486,13 @@
 <li>性能因素: GC<br>因此轮训在生产环境很少会使用，毕竟真实环境的请求处理成本一定是不均衡的。</li>
 </ul>
 <p><strong>最少连接数(inflight)</strong><br>统计每个连接的inflight请求数, 请求转发到请求最少的节点上。但还是存在请求处理成本的问题，虽然某些节点连接数少，但是万一有个请求成本很高，还是导致负载不均衡。</p>
-<p><strong>轮训加权</strong><br>以上两种负载均衡都是从client端出发，没有从下游负载去考虑，导致下游负载不均。所以轮训加权的实现思路是依据请求<strong>响应结果</strong>[成功&#x2F;失败]以及下游服务<strong>cpu使用率</strong>来动态控制节点权重(cpu使用率是通过rpc回报的元信息中获取)。</p>
-<p><strong>the choice of two  <a target="_blank" rel="noopener" href="https://github.com/go-kratos/kratos/blob/4a93aa9b8d5dca550cc60a0c51c4726f83a2e6f8/pkg/net/rpc/warden/balancer/p2c/p2c.go">B站实现</a></strong><br>选择 backend：CPU，client：health、inflight、latency 作为指标，使用一个简单的线性方程进行打分。<br>对新启动的节点使用常量惩罚值(penalty)，以及使用探针方式最小化放量，进行预热。<br>打分比较低的节点，避免进入“永久黑名单”而无法恢复，使用统计衰减的方式，让节点指标逐渐恢复到初始状态(即默认值)。指标计算结合 moving average，使用时间衰减，计算vt &#x3D; v(t-1) * β + at * (1-β) ，β为若干次幂的倒数即: Math.Exp((-span) &#x2F; 600ms)<br><img src="/images/bilibili_p2c.png" srcset="/img/loading.gif" lazyload alt="b站P2C实现"></p>
+<p><strong>加权轮训</strong><br>以上两种负载均衡都是从client端出发，没有从下游负载去考虑，导致下游负载不均。所以轮训加权的实现思路是依据请求<strong>响应结果</strong>[成功&#x2F;失败]以及下游服务<strong>cpu使用率</strong>来动态控制节点权重(cpu使用率是通过rpc回报获取)。</p>
+<p><strong>best of two random choices</strong><br>加权轮训的设计由于“信息滞后”存在“羊群效应”问题，原因有2点, 第一client至少需要1个RTT才能拿到cpu使用率，存在网络、先后请求延迟。第二“定期”更新节点权重。因此client以为拿到了最优节点，但实际请求的是“已经从不饱和变饱和”的节点，导致大量请求超时&#x2F;拒绝。<br>best of two random choices，则采用了带时间衰减的指数衰减(exponentially weighted moving average)[带系数的指数衰减]，引入了inflight，lag作为负载均衡的参考</p>
+<p><img src="/images/two_of_random_choices.png" srcset="/img/loading.gif" lazyload alt="two_of_random_choices"><br><strong>算法实现</strong><br><a target="_blank" rel="noopener" href="https://github.com/go-kratos/kratos/blob/4a93aa9b8d5dca550cc60a0c51c4726f83a2e6f8/pkg/net/rpc/warden/balancer/p2c/p2c.go">B站实现</a><br><img src="/images/two_of_random_choices_algo.png" srcset="/img/loading.gif" lazyload alt="算法实现"></p>
 <h2 id="分布式限流"><a href="#分布式限流" class="headerlink" title="分布式限流"></a>分布式限流</h2><ul>
 <li>即时消费即时结算</li>
 <li>先消费后结算</li>
-<li>预分配<br>这部分就不过多介绍，可以<a href="https://codingwhat.github.io/2024/07/09/limiter-in-action/">这篇文章</a></li>
+<li>预分配<br>这部分内容就不重复了，直接看<a href="https://codingwhat.github.io/2024/07/09/limiter-in-action/">限流实战</a></li>
 </ul>
 <h2 id="隔离"><a href="#隔离" class="headerlink" title="隔离"></a>隔离</h2><ul>
 <li>动静隔离</li>
