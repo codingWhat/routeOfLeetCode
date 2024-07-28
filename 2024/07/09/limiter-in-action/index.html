@@ -27,13 +27,13 @@
 <meta property="og:image" content="http://codingwhat.github.io/images/sentinel_limit_center.png">
 <meta property="og:image" content="http://codingwhat.github.io/images/sentinel_limit_embedded.png">
 <meta property="article:published_time" content="2024-07-09T09:42:14.000Z">
-<meta property="article:modified_time" content="2024-07-28T09:01:32.611Z">
+<meta property="article:modified_time" content="2024-07-28T09:06:10.894Z">
 <meta property="article:author" content="codingWhat">
 <meta property="article:tag" content="GO">
 <meta property="article:tag" content="可用性治理">
 <meta property="article:tag" content="限流">
 <meta property="article:tag" content="单机限流">
-<meta property="article:tag" content="分布式限流">
+<meta property="article:tag" content="集群限流">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="http://codingwhat.github.io/images/adaptive_throttling.png">
   
@@ -257,7 +257,7 @@
       <span class="post-meta mr-2">
         <i class="iconfont icon-chart"></i>
         
-          1.9k 字
+          2k 字
         
       </span>
     
@@ -355,9 +355,9 @@
 <li>在测试限流时，要设置合理的sleep时间，才能看出限流效果。<br>假设rate:1000(1s&#x2F;1000 -&gt; 1ms&#x2F;1), 想要模拟成功和拒绝是1:1，那就在sleep:500*time.Microsecond</li>
 <li>随着你测的rate越来越高，可能会发现success&#x2F;reject开始不精准，这是因为time.Sleep休眠时间不精确导致的，所以不用担心，<br>Sleep精准问题有兴趣可以看看<a target="_blank" rel="noopener" href="https://colobu.com/2023/12/07/more-precise-sleep/">这篇文章</a>，不精准是因为time.Sleep是异步系统调用获取的，所以必定产生延迟(即精度)</li>
 </ol>
-<h1 id="分布式限流"><a href="#分布式限流" class="headerlink" title="分布式限流"></a>分布式限流</h1><p>为什么要用分布式限流？在分布式场景下单机限流有2个缺陷：</p>
+<h1 id="集群限流"><a href="#集群限流" class="headerlink" title="集群限流"></a>集群限流</h1><p>为什么要用集群限流？在分布式场景下单机限流有2个缺陷：</p>
 <ul>
-<li>当限流配额&gt;节点数，单机限流就不能限制了；比如100个节点，50QPS，此时更适合分布式限流</li>
+<li>当限流配额&gt;节点数，单机限流就不能限制了；比如100个节点，50QPS，此时更适合集群限流</li>
 <li>当流量不均时，单机限流会出现误限; 比如50个节点，100QPS，此时单节点2QPS，但如果流量不均，没达到阈值就拒绝请求了</li>
 </ul>
 <h2 id="限流模式"><a href="#限流模式" class="headerlink" title="限流模式"></a>限流模式</h2><ul>
@@ -373,22 +373,28 @@
 <h3 id="批次分配-最终一致-性能高，但准确性会降低"><a href="#批次分配-最终一致-性能高，但准确性会降低" class="headerlink" title="批次分配  最终一致, 性能高，但准确性会降低"></a><font color="green">批次分配</font>  最终一致, 性能高，但准确性会降低</h3><p><font color="black">实现原理:</font><br><font color="orange">本地异步请求限流服务获取配额(quota)，本地采用静态限流算法</font></p>
 <p>一般都是客户端(LRU窗口)限流 + 客户端定期上报(ms级)配额到限流器 + 限流器响应客户端剩余配额 + 客户端重新计算限流额</p>
 <ul>
-<li>预分配后消费; Youtube doorman; 本地限流，会有误限的风险;适用服务级限流，读写分离的接口级限流</li>
-<li>先消费后结算; 阿里AHAS; 客户端基于剩余整体配额进行扣除，不再进行均摊，能解决误限的问题，可能会有超限; 服务&#x2F;接口限流等允许一定误差的限流场景</li>
+<li>预分配后消费; Youtube doorman; 本地限流，如果流量不均会有误限;适用服务级限流，读写分离的接口级限流</li>
+<li>先消费后结算; 阿里AHAS; 客户端基于剩余整体配额进行扣除，不再进行均摊，解决误限问题，但可能会有超限; 服务&#x2F;接口限流等允许一定误差的限流场景</li>
 </ul>
+<p>先消费后结算:</p>
 <ol>
-<li>异步定期(30ms)同步结算,</li>
-<li>一致性hash到对应的机器，</li>
-<li>下发所有剩余配额</li>
+<li>client异步定期(30ms)同步限流server结算,</li>
+<li>请求一致性hash到对应的限流server上，</li>
+<li>限流server下发所有剩余配额</li>
 </ol>
-<p>假设10个client,QPS限流1000， 每个节点QPS：100, 在30ms内消耗了100配额，实际放行请求: 10 * 1000个请求。<br>优化：</p>
+<p>存在问题:<br>假设10个client,QPS限流1000， 每个节点QPS：100, 在30ms内消耗了100配额，实际放行请求: 10 * 1000个请求。<br>优化：</p>
 <ul>
 <li>调整上报周期，降低周期+周期随机化(防止上报风暴)</li>
-<li>每个窗口都单独上报, 性能有损,对hash到同一节点的窗口合并批量上报</li>
-<li>如果同步限流集群失败，则降级为单机限流， 总配额&#x2F;客户端数(client)</li>
+<li>每个窗口都单独上报, 性能有损, 对hash到同一节点的窗口合并批量上报</li>
+<li>同步限流集群失败，降级为单机限流，总配额&#x2F;客户端数(client)</li>
 </ul>
-<p><a target="_blank" rel="noopener" href="https://sentinelguard.io/zh-cn/docs/cluster-flow-control.html">setinel</a>分布式限流(云上版本 AHAS Sentinel)</p>
+<p><a target="_blank" rel="noopener" href="https://sentinelguard.io/zh-cn/docs/cluster-flow-control.html">setinel</a>集群限流(云上版本 AHAS Sentinel)</p>
 <p><img src="/images/sentinel_limit_center.png" srcset="/img/loading.gif" lazyload alt="集中式"><br><img src="/images/sentinel_limit_embedded.png" srcset="/img/loading.gif" lazyload alt="嵌入式"></p>
+<h1 id="总结-1"><a href="#总结-1" class="headerlink" title="总结"></a>总结</h1><h2 id="限流策略"><a href="#限流策略" class="headerlink" title="限流策略"></a>限流策略</h2><ul>
+<li>多级限流(网关层、应用层、服务层、数据层)</li>
+<li>动态阈值调整(负载高降低权重)</li>
+<li>多级维度(ip,设备) + 业务侧规则(发评限制)</li>
+</ul>
 
                 
               </div>
@@ -409,7 +415,7 @@
       
         <a href="/tags/%E5%8D%95%E6%9C%BA%E9%99%90%E6%B5%81/" class="print-no-link">#单机限流</a>
       
-        <a href="/tags/%E5%88%86%E5%B8%83%E5%BC%8F%E9%99%90%E6%B5%81/" class="print-no-link">#分布式限流</a>
+        <a href="/tags/%E9%9B%86%E7%BE%A4%E9%99%90%E6%B5%81/" class="print-no-link">#集群限流</a>
       
     </div>
   
