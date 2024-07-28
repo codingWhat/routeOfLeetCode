@@ -27,7 +27,7 @@
 <meta property="og:image" content="http://codingwhat.github.io/images/sentinel_limit_center.png">
 <meta property="og:image" content="http://codingwhat.github.io/images/sentinel_limit_embedded.png">
 <meta property="article:published_time" content="2024-07-09T09:42:14.000Z">
-<meta property="article:modified_time" content="2024-07-26T10:31:40.390Z">
+<meta property="article:modified_time" content="2024-07-28T08:30:22.242Z">
 <meta property="article:author" content="codingWhat">
 <meta property="article:tag" content="GO">
 <meta property="article:tag" content="可用性治理">
@@ -257,7 +257,7 @@
       <span class="post-meta mr-2">
         <i class="iconfont icon-chart"></i>
         
-          1.8k 字
+          1.9k 字
         
       </span>
     
@@ -355,7 +355,12 @@
 <li>在测试限流时，要设置合理的sleep时间，才能看出限流效果。<br>假设rate:1000(1s&#x2F;1000 -&gt; 1ms&#x2F;1), 想要模拟成功和拒绝是1:1，那就在sleep:500*time.Microsecond</li>
 <li>随着你测的rate越来越高，可能会发现success&#x2F;reject开始不精准，这是因为time.Sleep休眠时间不精确导致的，所以不用担心，<br>Sleep精准问题有兴趣可以看看<a target="_blank" rel="noopener" href="https://colobu.com/2023/12/07/more-precise-sleep/">这篇文章</a>，不精准是因为time.Sleep是异步系统调用获取的，所以必定产生延迟(即精度)</li>
 </ol>
-<h1 id="分布式限流"><a href="#分布式限流" class="headerlink" title="分布式限流"></a>分布式限流</h1><h2 id="限流模式"><a href="#限流模式" class="headerlink" title="限流模式"></a>限流模式</h2><ul>
+<h1 id="分布式限流"><a href="#分布式限流" class="headerlink" title="分布式限流"></a>分布式限流</h1><p>为什么要用分布式限流？在分布式场景下单机限流有2个缺陷：</p>
+<ul>
+<li>当限流配额&gt;节点数，单机限流就不能限制了；比如50QPS，100个节点，此时更适合分布式限流</li>
+<li>当流量不均时，单机限流会出现误限流; 50个节点，100QPS，此时单节点2QPS，但如果流量不均，没达到阈值就拒绝请求了</li>
+</ul>
+<h2 id="限流模式"><a href="#限流模式" class="headerlink" title="限流模式"></a>限流模式</h2><ul>
 <li>单次分配，即时消费即时结算</li>
 <li>批次分配，先消费后结算</li>
 <li>批次分配，预先分配消费</li>
@@ -368,7 +373,7 @@
 <h3 id="批次分配-最终一致-性能高，但准确性会降低"><a href="#批次分配-最终一致-性能高，但准确性会降低" class="headerlink" title="批次分配  最终一致, 性能高，但准确性会降低"></a><font color="green">批次分配</font>  最终一致, 性能高，但准确性会降低</h3><p><font color="black">实现原理:</font><br><font color="orange">本地异步请求限流服务获取配额(quota)，本地采用静态限流算法</font></p>
 <p>一般都是客户端(LRU窗口)限流 + 客户端定期上报(ms级)配额到限流器 + 限流器响应客户端剩余配额 + 客户端重新计算限流额</p>
 <ul>
-<li>预分配后消费; Youtube doorman; 本地限流，会有误限的风险;单机流量在一定周期相对稳定的场景，如服务级限流，读写分离的接口级限流</li>
+<li>预分配后消费; Youtube doorman; 本地限流，会有误限的风险;适用服务级限流，读写分离的接口级限流</li>
 <li>先消费后结算; 阿里AHAS; 客户端基于剩余整体配额进行扣除，不再进行均摊，能解决误限的问题，可能会有超限; 服务&#x2F;接口限流等允许一定误差的限流场景</li>
 </ul>
 <p>海量限流纬度场景下优化:</p>
