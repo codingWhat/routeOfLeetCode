@@ -27,7 +27,7 @@
 <meta property="og:image" content="http://codingwhat.github.io/images/sentinel_limit_center.png">
 <meta property="og:image" content="http://codingwhat.github.io/images/sentinel_limit_embedded.png">
 <meta property="article:published_time" content="2024-07-09T09:42:14.000Z">
-<meta property="article:modified_time" content="2024-07-28T09:20:35.832Z">
+<meta property="article:modified_time" content="2024-07-28T09:28:27.058Z">
 <meta property="article:author" content="codingWhat">
 <meta property="article:tag" content="GO">
 <meta property="article:tag" content="可用性治理">
@@ -322,28 +322,22 @@
 <p>有经验的开发者都知道即便事前做了不同规模的容量模型，但是还是没办法准确预测未知的外部流量，因此服务必须得采取自保护策略，丢弃掉部分流量来保障服务的稳定性。</p>
 </blockquote>
 <span id="more"></span>
-<p>接下来我们会围绕单机&#x2F;集群限流、客户端&#x2F;服务端限流去拆解限流在不同场景的实践应用。</p>
-<h1 id="单机限流"><a href="#单机限流" class="headerlink" title="单机限流"></a>单机限流</h1><h2 id="服务端限流"><a href="#服务端限流" class="headerlink" title="服务端限流:"></a>服务端限流:</h2><h3 id="静态限流"><a href="#静态限流" class="headerlink" title="静态限流"></a>静态限流</h3><ul>
-<li><a href="golang.org/x/time/rate">标准库-令牌桶</a>, 应对小规模突发流量;</li>
-<li><a target="_blank" rel="noopener" href="https://github.com/uber-go/ratelimit">Uber-漏桶</a>, 匀速限流; 突发流量丢弃量多; !!这个库(v0.3.0)有bug<a target="_blank" rel="noopener" href="https://colobu.com/2023/12/05/two-bugs-of-uber-ratelimit/">点击</a></li>
-<li>滑动窗口, 精度高; 占用内存</li>
-<li>固定窗口, 实现简单; 不精准，存在边界问题</li>
-</ul>
-<p>共性:<br>优点: 实现简单<br>缺点:<br>1.基于QPS限流静态限流, 无法根据服务的负载动态限流<br>2.限流阈值不好配置(请求的处理成本不一致)<br>3.节点扩缩, 需要重新设置</p>
-<h3 id="动态限流-推荐"><a href="#动态限流-推荐" class="headerlink" title="动态限流[推荐]"></a>动态限流[推荐]</h3><p>通过实例的负载情况(采样窗口内的cpu使用率&#x2F;load1)进行动态设置限流阈值，让服务保持高水位高效运行。</p>
-<p><strong>开源实现:</strong><br><a target="_blank" rel="noopener" href="https://github.com/go-kratos/aegis/tree/main/ratelimit/bbr">B站-BBR</a><br><a target="_blank" rel="noopener" href="https://github.com/alibaba/sentinel-golang/wiki/%E7%B3%BB%E7%BB%9F%E8%87%AA%E9%80%82%E5%BA%94%E6%B5%81%E6%8E%A7">sentinel-go</a><br><a target="_blank" rel="noopener" href="https://queue.acm.org/appendices/codel.html">Co-DEL</a></p>
-<p><strong>实现原理:</strong><br>1.B站-BBR: 使用滑动窗口统计成功数、响应时间；通过滑窗计算平均响应时间，根据利特尔法则计算QPS，当CPU使用率满足阈值时，动态设置限流阈值。<br><code>QPS = (MaxPass(窗口内最大成功请求数) * MinRt(平均响应延时:ms) * BucketsPerSecond(1s的桶个数) /1000.0)</code></p>
-<p>2.Sentinel-go: 原理和B站类似，不过使用时load1(实时性较较差, 1分钟内的负载)</p>
-<p>3.Co-DEL: 传统FIFO在海量请求场景下会出现大量请求“饿死”的情况, 而codel很好的规避了这个问题，codel会清理超时请求并且自动拒绝。<a target="_blank" rel="noopener" href="https://github.com/LyricTian/kratos/blob/bd2d576848f44f7bf4eb7c9420b36093fa4f8ef7/pkg/container/queue/aqm/codel.go">B站的实现</a>有2个容忍窗口, 容忍窗口期间请求还是会被放行, 超过窗口的才会被拒绝。</p>
-<h3 id="服务分级"><a href="#服务分级" class="headerlink" title="服务分级"></a>服务分级</h3><p>在对服务进行限流时，可以引入更细的粒度-<strong>Criticality</strong>来分级限流,</p>
+<p>接下来我们会围绕单机&#x2F;集群限流、客户端&#x2F;服务端限流去拆解限流在不同场景的工程实践。</p>
+<h1 id="单机限流"><a href="#单机限流" class="headerlink" title="单机限流"></a>单机限流</h1><h2 id="服务端限流"><a href="#服务端限流" class="headerlink" title="服务端限流"></a>服务端限流</h2><p><strong>静态限流</strong><br><a href="golang.org/x/time/rate">标准库-令牌桶</a>, 应对小规模突发流量;<br><a target="_blank" rel="noopener" href="https://github.com/uber-go/ratelimit">Uber-漏桶</a>, 匀速限流; 突发流量丢弃量多; !!这个库(v0.3.0)有bug<a target="_blank" rel="noopener" href="https://colobu.com/2023/12/05/two-bugs-of-uber-ratelimit/">点击</a><br>滑动窗口, 精度高; 占用内存<br>固定窗口, 实现简单; 不精准，存在边界问题</p>
+<p>总结:</p>
 <ul>
-<li>CRITICAL_PLUS, 最高优先级，影响面:用户可见，严重；容量设置需充足</li>
-<li>CRITICAL, 次优先级，影响面:用户可见，不如Plus严重；容量设置需充足</li>
-<li>SHEDDABLE_PLUS, 异步任务，可定期重试</li>
-<li>SHEDDABLE，最低优先级，接受不可用</li>
+<li>实现简单</li>
+<li>基于QPS限流静态限流, 无法根据服务的负载动态限流  </li>
+<li>限流阈值不好配置(请求的处理成本不一致)  </li>
+<li>节点扩缩, 需要重新设置</li>
 </ul>
-<p>Criticality 应该在服务调用链中逐级传递下去。</p>
-<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h3><ul>
+<p><strong>动态限流[推荐]</strong><br>通过实例的负载情况(采样窗口内的cpu使用率&#x2F;load1)进行动态设置限流阈值，让服务保持高水位高效运行。</p>
+<p>开源实现:<br><a target="_blank" rel="noopener" href="https://github.com/go-kratos/aegis/tree/main/ratelimit/bbr">B站-BBR</a><br><a target="_blank" rel="noopener" href="https://github.com/alibaba/sentinel-golang/wiki/%E7%B3%BB%E7%BB%9F%E8%87%AA%E9%80%82%E5%BA%94%E6%B5%81%E6%8E%A7">sentinel-go</a><br><a target="_blank" rel="noopener" href="https://queue.acm.org/appendices/codel.html">Co-DEL</a></p>
+<p>实现原理:<br>1.B站-BBR: 使用滑动窗口统计成功数、响应时间；通过滑窗计算平均响应时间，根据利特尔法则计算QPS，当CPU使用率满足阈值时，动态设置限流阈值。<br><code>QPS = (MaxPass(窗口内最大成功请求数) * MinRt(平均响应延时:ms) * BucketsPerSecond(1s的桶个数) /1000.0)</code></p>
+<p>2.Sentinel-go: 原理和B站类似，不过使用时load1(实时性较较差, 1分钟内的负载)<br>3.Co-DEL: 传统FIFO在海量请求场景下会出现大量请求“饿死”的情况, 而codel很好的规避了这个问题，codel会清理超时请求并且自动拒绝。<a target="_blank" rel="noopener" href="https://github.com/LyricTian/kratos/blob/bd2d576848f44f7bf4eb7c9420b36093fa4f8ef7/pkg/container/queue/aqm/codel.go">B站的实现</a>有2个容忍窗口, 容忍窗口期间请求还是会被放行, 超过窗口的才会被拒绝。</p>
+<p>服务分级<br>在对服务进行限流时，可以引入更细的粒度-<strong>Criticality</strong>来分级限流,<br>CRITICAL_PLUS, 最高优先级，影响面:用户可见，严重；容量设置需充足<br>CRITICAL, 次优先级，影响面:用户可见，不如Plus严重；容量设置需充足<br>SHEDDABLE_PLUS, 异步任务，可定期重试<br>SHEDDABLE，最低优先级，接受不可用<br><font color="red">Criticality 应该在服务调用链中逐级传递下去。</font></p>
+<p>总结</p>
+<ul>
 <li>精确限流, 动态调整阈值, 和服务负载正相关; 但是实现复杂，需要额外资源统计CPU使用率、QPS吞吐等</li>
 <li>请求分优先级(用户纬度)，可按优先级丢弃、可以存在一定超卖。</li>
 <li>拒绝请求也需要成本, cliet端需要截流(直接往上抛或者重试其他节点)</li>
@@ -390,7 +384,7 @@
 </ul>
 <p><a target="_blank" rel="noopener" href="https://sentinelguard.io/zh-cn/docs/cluster-flow-control.html">setinel</a>集群限流(云上版本 AHAS Sentinel)</p>
 <p><img src="/images/sentinel_limit_center.png" srcset="/img/loading.gif" lazyload alt="集中式"><br><img src="/images/sentinel_limit_embedded.png" srcset="/img/loading.gif" lazyload alt="嵌入式"></p>
-<h1 id="总结-1"><a href="#总结-1" class="headerlink" title="总结"></a>总结</h1><h2 id="限流策略"><a href="#限流策略" class="headerlink" title="限流策略"></a>限流策略</h2><ul>
+<h2 id="限流策略"><a href="#限流策略" class="headerlink" title="限流策略"></a>限流策略</h2><ul>
 <li>多级限流(网关层、应用层、服务层、数据层)</li>
 <li>动态阈值调整(负载高降低权重)</li>
 <li>多级维度(ip,设备) + 业务侧规则(发评限制)</li>
