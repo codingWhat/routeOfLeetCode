@@ -26,7 +26,7 @@
 <meta property="og:image" content="http://codingwhat.github.io/images/wireshark_502.png">
 <meta property="og:image" content="http://codingwhat.github.io/images/now_502.png">
 <meta property="article:published_time" content="2024-07-09T08:35:08.000Z">
-<meta property="article:modified_time" content="2024-07-30T10:26:59.536Z">
+<meta property="article:modified_time" content="2024-07-30T10:28:19.869Z">
 <meta property="article:author" content="codingWhat">
 <meta property="article:tag" content="Go">
 <meta property="article:tag" content="Nginx">
@@ -343,7 +343,7 @@
 <blockquote>
 <p>nginx error log: “upstream prematurely closed connection while reading response header from upstream”</p>
 </blockquote>
-<p>很明显服务主动关闭了连接，httpServer主动关闭连接一般是read&#x2F;write超时了, 但是查看服务配置发现read&#x2F;write分别1s&#x2F;3s, 并且服务逻辑中都有严格的超时控制、没有阻塞逻辑，讲道理不太可能触发，所以这里排除。问题到这里似乎进到死胡同了，这时在看底层server配置时发现一个超时配置<font color="red">idletimeout</font>, 根据注释以及google之后发现就是keepalive超时控制，我们知道http1.1默认都是keepalive, 如果触发了keepalive timeout 是会主动关闭连接，到这里似乎有了眉目。</p>
+<p>很明显服务主动关闭了连接，httpServer主动关闭连接一般是read&#x2F;write超时了, 但是查看服务配置发现read&#x2F;write分别1s&#x2F;3s, 并且服务逻辑中都有严格的超时控制、没有阻塞逻辑，讲道理不太可能触发，所以这里排除。问题到这里似乎进到死胡同了，这时在看server源码是发现<font color="red">idletimeout</font>这个配置, 根据注释以及google之后发现就是keepalive超时控制，我们知道http1.1默认都是keepalive, 如果触发了keepalive timeout 是会主动关闭连接，到这里似乎有了眉目。</p>
 <p><img src="/images/wireshark_502.png" srcset="/img/loading.gif" lazyload alt="img.png"></p>
 <p>这里总结下整个请求链路.<br>首先nginx和upstream server(go 服务)之间会创建多个连接；外部请求进来以后, nginx作为client端，从连接池获取一个连接请求，如果此时刚好这个连接keepalive timeout了那么就会触发502。</p>
 <p>问题解决:</p>
