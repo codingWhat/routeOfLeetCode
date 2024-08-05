@@ -4,6 +4,31 @@
   
   
   <entry>
+    <title>实现高性能的本地缓存库</title>
+    <link href="/2024/08/05/local-cache-go-impl/"/>
+    <url>/2024/08/05/local-cache-go-impl/</url>
+    
+    <content type="html"><![CDATA[<blockquote><p>在日常高流量场景中(读多写少场景)，经常会使用高性能的本地缓存来应对热点流量，保障系统的稳定。本文就来揭秘下缓存库的一些”内部真相”，让我们一探究竟。</p></blockquote><span id="more"></span><h2 id="开源社区"><a href="#开源社区" class="headerlink" title="开源社区"></a>开源社区</h2><p>首先我们从主流缓存库入手，了解下缓存库种类、特点以及其适用场景。在Go的生态中缓存库种类丰富，并且每个缓存都有其自己独特的”卖点”，能应对不同场景。为了方便学习和理解，我对主流库做了详细调研和源码阅读，整理出以下多维度对比图。</p><table><thead><tr><th>缓存库</th><th>社区活跃度</th><th>过期时间</th><th>GC</th><th>无GC实现原理</th><th>设计原理</th><th>淘汰机制</th><th>设计缺陷</th></tr></thead><tbody><tr><td>freecache</td><td>start:5k,fork:390</td><td>支持</td><td><font color="red"> Zero GC</font></td><td>减少指针数，固定512个(256个segment，每个segment两个指针,RingBuf、[]entryPtr)</td><td>(分片+互斥锁) + 内置map + slice + ringbuffer</td><td>LRU</td><td>不支持自动扩容</td></tr><tr><td>bigcache</td><td>start:7.4k,fork:591</td><td>支持</td><td><font color="red"> Zero GC</font></td><td>无指针的map, map[uint64]uint32</td><td>(分片+读写锁) + map[uint64]uint32 + fifo-buffer</td><td>FIFO</td><td>不支持对key设置过期时间</td></tr><tr><td>fastcache</td><td>start:2.1k,fork:175</td><td>不支持</td><td><font color="red"> Zero GC</font></td><td>无指针的map, map[uint64]uint32</td><td>(分片+读写锁) + map[uint64]uint64 + ringbuffer(chunks [][]byte)</td><td>FIFO</td><td>不支持过期时间</td></tr><tr><td>groupcache</td><td>start:12.9k,fork:1.4k</td><td>不支持</td><td>有</td><td>-</td><td>单元格3</td><td>LRU</td><td>不支持过期时间</td></tr><tr><td>go-cache</td><td>start:8k,fork:865</td><td>支持</td><td>有</td><td>-</td><td>全局读写锁 + map[string]item</td><td>定期清理过期数据</td><td>锁竞争严重</td></tr><tr><td>ristretto</td><td>start:5.5k,fork:365</td><td>支持</td><td>有</td><td>-</td><td>分片+读写锁</td><td>TinyLFU&#x2F;SampledLFU，expireMap: map[timestamp]bucket, 一个周期对应一个bucket, 定期清理过期的bucket</td><td>-</td></tr><tr><td>offheap</td><td>start:363,fork:37</td><td>不支持</td><td><font color="red"> Zero GC</font></td><td>堆外内存，syscall.Mmap</td><td>内置HashTable  + syscall.Mmap</td><td>-</td><td>冲突时通过本地探测法，影响性能</td></tr></tbody></table><blockquote><p>任何一个缓存库的诞生都是为了解决特定场景的特定问题。比如存储百万对象的map会导致GC扫描耗时变长，为了规避GC扫描的影响，这才催生了<font color="red">Zero GC</font>缓存库。</p></blockquote><p>综上要实现<font color="Green">通用</font>的高性能的本地缓存，主要围绕以下方面</p><ul><li>锁竞争。全局锁导致大量请求都在抢锁、休眠、严重影响性能</li><li>数据淘汰。内存资源有限，必须要根据一定策略淘汰数据</li><li>GC问题。存储海量对象时，GC扫描的影响不容小觑, 就算不能无GC，也得尽可能减少扫描对象</li></ul><h2 id="目标"><a href="#目标" class="headerlink" title="目标"></a>目标</h2><ul><li>高性能</li><li>使用简单</li><li>支持按key设置过期时间</li><li>支持自动淘汰(LRU)</li></ul><p>支持API:</p><figure class="highlight golang"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><code class="hljs golang"><br><span class="hljs-keyword">type</span> Cache <span class="hljs-keyword">interface</span> &#123;<br>Set(k <span class="hljs-type">string</span>, v any, ttl time.Duration) <span class="hljs-type">bool</span><br>Get(k <span class="hljs-type">string</span>) (v any, err <span class="hljs-type">error</span>)<br>Del(k <span class="hljs-type">string</span>)<br>Len() <span class="hljs-type">uint64</span><br>Close()<br>&#125;<br></code></pre></td></tr></table></figure><h2 id="核心数据结构"><a href="#核心数据结构" class="headerlink" title="核心数据结构"></a>核心数据结构</h2><h4 id="cache"><a href="#cache" class="headerlink" title="cache"></a>cache</h4><figure class="highlight golang"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><code class="hljs golang"><br><span class="hljs-keyword">type</span> cache <span class="hljs-keyword">struct</span> &#123;<br>size <span class="hljs-type">int</span><br><br>store            store<br>policy           Policy<br>ekt              *expireKeyTimers<br>accessUniqBuffer *uniqRingBuffer<br><br>accessEvtCh <span class="hljs-keyword">chan</span> []*list.Element <span class="hljs-comment">//需要合并</span><br>updateEvtCh <span class="hljs-keyword">chan</span> *entExtendFunc<br>addEvtCh    <span class="hljs-keyword">chan</span> *entExtendFunc<br>delEvtCh    <span class="hljs-keyword">chan</span> *keyExtendFunc<br><br>isSync     <span class="hljs-type">bool</span><br>setTimeout time.Duration<br>&#125;<br></code></pre></td></tr></table></figure><h4 id="store"><a href="#store" class="headerlink" title="store"></a>store</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><code class="hljs azure">type store interface &#123;<br>    set(k string, v any)<br>    get(k string) (any, bool)<br>    del(k string)<br>    len() uint64<br>    clear()<br>&#125;<br><br>type shardedMap struct &#123;<br>    shards []*safeMap<br>&#125;<br></code></pre></td></tr></table></figure>]]></content>
+    
+    
+    
+    <tags>
+      
+      <tag>GO</tag>
+      
+      <tag>本地缓存</tag>
+      
+      <tag>LRU</tag>
+      
+      <tag>高性能</tag>
+      
+    </tags>
+    
+  </entry>
+  
+  
+  
+  <entry>
     <title>服务可用性-理论篇</title>
     <link href="/2024/07/28/service-avaliable/"/>
     <url>/2024/07/28/service-avaliable/</url>
