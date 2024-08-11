@@ -95,28 +95,22 @@ func (tb *TokenBucket) Allow() bool {
 
 func main() {
 	tokenBucket := NewTokenBucket(2.0, 1.0)
-
-    succ := 0
-	reject := 0
-	for i := 1; i <= 30; i++ {
-		now := time.Now().Format("15:04:05")
+      success := 0
+      reject := 0
+	for {
 		if tokenBucket.Allow() {
-			succ++
-			//fmt.Printf(now+"  第 %d 个请求通过\n", i)
-		} else { // 如果不能移除一个令牌，请求被拒绝。
-			reject++
-			//fmt.Printf(now+"  第 %d 个请求被限流\n", i)
+			fmt.Println(time.Now().Format("15:04:05"), ", 请求通过\n")
+			success++
+		}else {
+		    reject++
 		}
-		time.Sleep(100 * time.Millisecond) 
 	}
-	fmt.Println(succ, "===>", reject)
+	
+	fmt.Println(success, "<======>", reject)
 }
 ```
-注意:
-1. 在测试限流时，要设置合理的sleep时间，才能看出限流效果。
-   假设rate:1000(1s/1000 -> 1ms/1), 想要模拟成功和拒绝是1:1，那就在sleep:500*time.Microsecond
-2. 随着你测的rate越来越高，可能会发现success/reject开始不精准，这是因为time.Sleep休眠时间不精确导致的，所以不用担心，
-   Sleep精准问题有兴趣可以看看[这篇文章](https://colobu.com/2023/12/07/more-precise-sleep/)，不精准是因为time.Sleep是异步系统调用获取的，所以必定产生延迟(即精度)
+tips:
+Sleep精准问题有兴趣可以看看[这篇文章](https://colobu.com/2023/12/07/more-precise-sleep/）
 
 # 动态限流
 通过实例的负载情况(采样窗口内的cpu使用率/load1)进行动态设置限流阈值，让服务保持高水位高效运行。
