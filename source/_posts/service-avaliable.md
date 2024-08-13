@@ -41,15 +41,21 @@ MTTF越长说明系统可用性越好，越稳定。MTTR则代表系统恢复速
 
 # 如何衡量可用性?
 知道了可用性要解决的问题域，接下来我们详细看下可用性指标。
-![可用性公式](/images/available_mttf_mttr.png)
+![可用性公式](/images/sa_formula.png)
+
+
 这里的关键是`MTTR`-平均故障修复时间，而`MTTR`又可以分为:
 `MTTI`(mean time to identify), 平均故障识别时间，这个阶段会通过各个渠道(告警、舆情、用户反馈)收到故障信息  
 `MTTK`(mean time to know), 平均故障认知时间，定位业务、定位对应开发、开发定位问题根因所花时间  
 `MTTS`(mean time to solve), 平均故障解决时间，这部分主要包含上线修复、验证的时间
 
+![MTTR细节](/images/sa_mttr_detail.png)
 
 # 如何提升可用性?
-基于已知的`可用性公式`，只能缩短`MTTR`，也就是说:  `减少故障数量`、`加快问题发现[MTTI]`以及`加快问题定位[MTTK]`。
+
+基于已知的`可用性公式`，只能缩短`MTTR`，也就是说:  `减少故障数量`、`加快问题发现定位[MTTI+MTTK]`以及`加快问题解决[MTTS]`。
+
+![提升可用性](/images/sa_pre_handle_fail_and_fail_identify_solve.png)
 
 ## 减少故障数量【事前】
 ![上线前 + 上线中](/images/sa_pre_online.png)
