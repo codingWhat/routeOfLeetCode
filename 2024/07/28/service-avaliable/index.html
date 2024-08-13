@@ -27,7 +27,7 @@
 <meta property="og:image" content="http://codingwhat.github.io/images/sa_fail_type.png">
 <meta property="og:image" content="http://codingwhat.github.io/images/available_mttf_mttr.png">
 <meta property="article:published_time" content="2024-07-28T09:52:10.000Z">
-<meta property="article:modified_time" content="2024-08-13T10:50:29.680Z">
+<meta property="article:modified_time" content="2024-08-13T10:52:26.066Z">
 <meta property="article:author" content="codingWhat">
 <meta property="article:tag" content="GO">
 <meta property="article:tag" content="可用性治理">
@@ -341,7 +341,7 @@
 <h1 id="故障的种类"><a href="#故障的种类" class="headerlink" title="故障的种类"></a>故障的种类</h1><p><img src="/images/sa_fail_type.png" srcset="/img/loading.gif" lazyload alt="故障种类"></p>
 <p>如图故障主要分为以上5类，其中只有<code>变更类</code>是主动触发的，其他都是外部因素导致的，不过还是需要重视和解决。</p>
 <h1 id="如何衡量可用性"><a href="#如何衡量可用性" class="headerlink" title="如何衡量可用性?"></a>如何衡量可用性?</h1><p>知道了可用性的重要性，也知道了可用性要解决的问题域，接下来我们看下如何衡量系统可用性。<br><img src="/images/available_mttf_mttr.png" srcset="/img/loading.gif" lazyload alt="可用性公式"><br>这里的关键是<code>MTTR</code>-平均故障修复时间，而<code>MTTR</code>又可以分为:<br><code>MTTI</code>(mean time to identify), 平均故障识别时间，这个阶段会通过各个渠道(告警、舆情、用户反馈)收到故障信息<br><code>MTTK</code>(mean time to know), 平均故障认知时间，定位业务、定位对应开发、开发定位问题根因所花时间<br><code>MTTS</code>(mean time to solve), 平均故障解决时间，这部分主要包含上线修复、验证的时间</p>
-<h1 id="如何提升可用性"><a href="#如何提升可用性" class="headerlink" title="如何提升可用性?"></a>如何提升可用性?</h1><p>基于已知的<code>可用性公式</code>，很容易就能看出要提升可用性只能缩短<code>MTTR</code>，也就是说: <code>减少故障数量</code> + <code>加快问题发现</code> +  <code>加快问题定位</code>。</p>
+<h1 id="如何提升可用性"><a href="#如何提升可用性" class="headerlink" title="如何提升可用性?"></a>如何提升可用性?</h1><p>基于已知的<code>可用性公式</code>，只能缩短<code>MTTR</code>，也就是说:  <code>加快问题发现</code> 、  <code>加快问题定位</code> 以及 <code>减少故障数量</code>。</p>
 <h2 id="上线前"><a href="#上线前" class="headerlink" title="上线前"></a>上线前</h2><h3 id="变更规范"><a href="#变更规范" class="headerlink" title="变更规范"></a>变更规范</h3><ul>
 <li>严格上线流程</li>
 <li>代码&#x2F;配置变更</li>
