@@ -1,0 +1,787 @@
+
+
+<!DOCTYPE html>
+<html lang="zh-CN" data-default-color-scheme=auto>
+
+
+
+<head>
+  <meta charset="UTF-8">
+  <link rel="apple-touch-icon" sizes="76x76" href="/img/fluid.png">
+  <link rel="icon" href="/img/fluid.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, shrink-to-fit=no">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  
+  <meta name="theme-color" content="#2f4154">
+  <meta name="author" content="codingWhat">
+  <meta name="keywords" content="evanhan codingWhat 博客 韩伟的博客 系统设计 后端开发">
+  
+    <meta name="description" content="线上巡检发现很多502日志，于是就开始了漫漫debug">
+<meta property="og:type" content="article">
+<meta property="og:title" content="go_nginx_502问题排查">
+<meta property="og:url" content="http://codingwhat.github.io/2024/07/09/go-nginx-502/index.html">
+<meta property="og:site_name" content="codingWhat Blog">
+<meta property="og:description" content="线上巡检发现很多502日志，于是就开始了漫漫debug">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://codingwhat.github.io/images/wireshark_502.png">
+<meta property="og:image" content="http://codingwhat.github.io/images/now_502.png">
+<meta property="article:published_time" content="2024-07-09T08:35:08.000Z">
+<meta property="article:modified_time" content="2024-07-30T10:38:19.378Z">
+<meta property="article:author" content="codingWhat">
+<meta property="article:tag" content="Go">
+<meta property="article:tag" content="Nginx">
+<meta property="article:tag" content="502">
+<meta property="article:tag" content="keepalive">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="http://codingwhat.github.io/images/wireshark_502.png">
+  
+  
+  
+  <title>go_nginx_502问题排查 - codingWhat Blog</title>
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/twitter-bootstrap/4.6.1/css/bootstrap.min.css" />
+
+
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/github-markdown-css/4.0.0/github-markdown.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/hint.css/2.7.0/hint.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.css" />
+
+
+
+<!-- 主题依赖的图标库，不要自行修改 -->
+<!-- Do not modify the link that theme dependent icons -->
+
+<link rel="stylesheet" href="//at.alicdn.com/t/font_1749284_hj8rtnfg7um.css">
+
+
+
+<link rel="stylesheet" href="//at.alicdn.com/t/font_1736178_lbnruvf0jn.css">
+
+
+<link  rel="stylesheet" href="/css/main.css" />
+
+
+  <link id="highlight-css" rel="stylesheet" href="/css/highlight.css" />
+  
+    <link id="highlight-css-dark" rel="stylesheet" href="/css/highlight-dark.css" />
+  
+
+
+
+
+  <script id="fluid-configs">
+    var Fluid = window.Fluid || {};
+    Fluid.ctx = Object.assign({}, Fluid.ctx)
+    var CONFIG = {"hostname":"codingwhat.github.io","root":"/","version":"1.9.7","typing":{"enable":true,"typeSpeed":70,"cursorChar":"_","loop":false,"scope":[]},"anchorjs":{"enable":true,"element":"h1,h2,h3,h4,h5,h6","placement":"left","visible":"hover","icon":""},"progressbar":{"enable":true,"height_px":3,"color":"#29d","options":{"showSpinner":false,"trickleSpeed":100}},"code_language":{"enable":true,"default":"TEXT"},"copy_btn":true,"image_caption":{"enable":true},"image_zoom":{"enable":true,"img_url_replace":["",""]},"toc":{"enable":true,"placement":"right","headingSelector":"h1,h2,h3,h4,h5,h6","collapseDepth":0},"lazyload":{"enable":true,"loading_img":"/img/loading.gif","onlypost":false,"offset_factor":2},"web_analytics":{"enable":true,"follow_dnt":true,"baidu":null,"google":{"measurement_id":null},"tencent":{"sid":null,"cid":null},"woyaola":null,"cnzz":null,"leancloud":{"app_id":"bp8GoUBWrJcqrTcWZR7ark7W-gzGzoHsz","app_key":"72QDRB9uHrgahwILCMXUBqo7","server_url":"https://bp8goubw.lc-cn-n1-shared.com","path":"window.location.pathname","ignore_local":false}},"search_path":"/local-search.xml","include_content_in_search":true};
+
+    if (CONFIG.web_analytics.follow_dnt) {
+      var dntVal = navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack;
+      Fluid.ctx.dnt = dntVal && (dntVal.startsWith('1') || dntVal.startsWith('yes') || dntVal.startsWith('on'));
+    }
+  </script>
+  <script  src="/js/utils.js" ></script>
+  <script  src="/js/color-schema.js" ></script>
+  
+
+  
+
+  
+    <!-- Google tag (gtag.js) -->
+    <script async>
+      if (!Fluid.ctx.dnt) {
+        Fluid.utils.createScript("https://www.googletagmanager.com/gtag/js?id=", function() {
+          window.dataLayer = window.dataLayer || [];
+          function gtag() {
+            dataLayer.push(arguments);
+          }
+          gtag('js', new Date());
+          gtag('config', '');
+        });
+      }
+    </script>
+  
+
+  
+
+  
+
+  
+
+  
+    
+  
+
+
+
+  
+<meta name="generator" content="Hexo 7.3.0"></head>
+
+
+<body>
+  
+
+  <header>
+    
+
+<div class="header-inner" style="height: 70vh;">
+  <nav id="navbar" class="navbar fixed-top  navbar-expand-lg navbar-dark scrolling-navbar">
+  <div class="container">
+    <a class="navbar-brand" href="/">
+      <strong>Coding What Blog</strong>
+    </a>
+
+    <button id="navbar-toggler-btn" class="navbar-toggler" type="button" data-toggle="collapse"
+            data-target="#navbarSupportedContent"
+            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+      <div class="animated-icon"><span></span><span></span><span></span></div>
+    </button>
+
+    <!-- Collapsible content -->
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      <ul class="navbar-nav ml-auto text-center">
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/" target="_self">
+                <i class="iconfont icon-home-fill"></i>
+                <span>首页</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/archives/" target="_self">
+                <i class="iconfont icon-archive-fill"></i>
+                <span>归档</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/categories/" target="_self">
+                <i class="iconfont icon-category-fill"></i>
+                <span>分类</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/tags/" target="_self">
+                <i class="iconfont icon-tags-fill"></i>
+                <span>标签</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/about/" target="_self">
+                <i class="iconfont icon-user-fill"></i>
+                <span>关于</span>
+              </a>
+            </li>
+          
+        
+        
+          <li class="nav-item" id="search-btn">
+            <a class="nav-link" target="_self" href="javascript:;" data-toggle="modal" data-target="#modalSearch" aria-label="Search">
+              <i class="iconfont icon-search"></i>
+            </a>
+          </li>
+          
+        
+        
+          <li class="nav-item" id="color-toggle-btn">
+            <a class="nav-link" target="_self" href="javascript:;" aria-label="Color Toggle">
+              <i class="iconfont icon-dark" id="color-toggle-icon"></i>
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</nav>
+
+  
+
+<div id="banner" class="banner" parallax=true
+     style="background: url('/img/default.png') no-repeat center center; background-size: cover;">
+  <div class="full-bg-img">
+    <div class="mask flex-center" style="background-color: rgba(0, 0, 0, 0.3)">
+      <div class="banner-text text-center fade-in-up">
+        <div class="h2">
+          
+            <span id="subtitle" data-typed-text="go_nginx_502问题排查"></span>
+          
+        </div>
+
+        
+          
+  <div class="mt-3">
+    
+    
+      <span class="post-meta">
+        <i class="iconfont icon-date-fill" aria-hidden="true"></i>
+        <time datetime="2024-07-09 16:35" pubdate>
+          2024年7月9日 下午
+        </time>
+      </span>
+    
+  </div>
+
+  <div class="mt-1">
+    
+      <span class="post-meta mr-2">
+        <i class="iconfont icon-chart"></i>
+        
+          1.1k 字
+        
+      </span>
+    
+
+    
+      <span class="post-meta mr-2">
+        <i class="iconfont icon-clock-fill"></i>
+        
+        
+        
+          9 分钟
+        
+      </span>
+    
+
+    
+    
+      
+        <span id="leancloud-page-views-container" class="post-meta" style="display: none">
+          <i class="iconfont icon-eye" aria-hidden="true"></i>
+          <span id="leancloud-page-views"></span> 次
+        </span>
+        
+      
+    
+  </div>
+
+
+        
+      </div>
+
+      
+    </div>
+  </div>
+</div>
+
+</div>
+
+  </header>
+
+  <main>
+    
+      
+
+<div class="container-fluid nopadding-x">
+  <div class="row nomargin-x">
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+
+    </div>
+
+    <div class="col-lg-8 nopadding-x-md">
+      <div class="container nopadding-x-md" id="board-ctn">
+        <div id="board">
+          <article class="post-content mx-auto">
+            <h1 id="seo-header">go_nginx_502问题排查</h1>
+            
+            
+              <div class="markdown-body">
+                
+                <blockquote>
+<p>线上巡检发现很多502日志，于是就开始了漫漫debug</p>
+</blockquote>
+<span id="more"></span>
+
+<p>简单介绍背景</p>
+<ol>
+<li>线上服务:</li>
+</ol>
+<ul>
+<li>容器部署</li>
+<li>http</li>
+<li>Nginx + Go</li>
+<li>服务耗时基本在100ms左右</li>
+</ul>
+<ol start="2">
+<li>已做排查，排除服务不可用导致的502问题</li>
+</ol>
+<ul>
+<li>服务是否重启</li>
+<li>容器是否异常、重启</li>
+<li>磁盘、cpu是否异常</li>
+</ul>
+<h2 id="问题现场"><a href="#问题现场" class="headerlink" title="问题现场"></a>问题现场</h2><h3 id="问题1-upstream-prematurely-closed-connection"><a href="#问题1-upstream-prematurely-closed-connection" class="headerlink" title="问题1: upstream prematurely closed connection"></a>问题1: upstream prematurely closed connection</h3><p>在排查nginx日志时发现如下错误</p>
+<blockquote>
+<p>nginx error log: “upstream prematurely closed connection while reading response header from upstream”</p>
+</blockquote>
+<p>很明显服务主动关闭了连接，httpServer主动关闭连接一般是read&#x2F;write超时了, 但是查看服务配置发现read&#x2F;write分别1s&#x2F;3s, 并且服务逻辑中都有严格的超时控制、没有阻塞逻辑，讲道理不太可能触发，所以这里排除。问题到这里似乎进到死胡同了，这时在看server源码是发现<font color="red">idletimeout</font>这个配置, 如果没有设置默认取read timeout，经google之后发现就是keepalive的timeout。我们知道http&#x2F;1.1默认都是keepalive的, 如果触发了keepalive timeout, server会主动关闭连接，于是开始抓包分析(如下图)，发现go服务在1s之后主动断开了和nginx的连接。</p>
+<p><img src="/images/wireshark_502.png" srcset="/img/loading.gif" lazyload alt="img.png"></p>
+<p>这里总结下整个请求链路.<br>首先nginx和upstream server(go 服务)之间会创建多个连接；外部请求进来以后, nginx作为client端，从连接池获取一个连接请求，如果此时刚好这个连接keepalive timeout了那么就会触发502。</p>
+<p>问题解决:</p>
+<ol>
+<li>nginx proxy设置keepalive;<br><code>proxy_http_version 1.1</code> 、 <code>proxy_set_header Connection &quot;&quot;</code><br>upstream不需要外部请求Connection控制，直接清空<figure class="highlight nginx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><code class="hljs nginx"><span class="hljs-section">location</span> / &#123;<br>        <span class="hljs-attribute">proxy_pass</span> xxxx;<br>        <br>        <span class="hljs-comment"># !!!!! start </span><br>        <span class="hljs-attribute">proxy_http_version</span> <span class="hljs-number">1</span>.<span class="hljs-number">1</span>;<br>        <span class="hljs-attribute">proxy_set_header</span> Connection <span class="hljs-string">&quot;&quot;</span>;<br>         <span class="hljs-comment"># !!!!! end </span><br>        <span class="hljs-comment">#proxy_read_timeout     300;    </span><br>        <span class="hljs-comment">#proxy_connect_timeout  300;</span><br>        <span class="hljs-comment">#proxy_set_header X-Real-IP $remote_addr;</span><br>        <span class="hljs-comment"># needed for HTTPS</span><br>        <span class="hljs-comment"># # proxy_set_header X_FORWARDED_PROTO https;</span><br>        <span class="hljs-comment">#proxy_set_header X-Forwarded-For $remote_addr;</span><br>        <span class="hljs-comment">#proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;</span><br>        <span class="hljs-comment">#proxy_set_header Host $host;</span><br>&#125;<br></code></pre></td></tr></table></figure></li>
+<li>nginx.conf设置keepalive timeout<br>这里时nginx和外部请求的keepalive, 如果超过这时间nginx会关闭连接。<figure class="highlight abnf"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><code class="hljs abnf">keepalive_timeout  <span class="hljs-number">60</span>s<span class="hljs-comment">;</span><br></code></pre></td></tr></table></figure></li>
+<li>upstream server设置keepalive timeout<figure class="highlight lasso"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><code class="hljs lasso">&amp;http.Server&#123;<br>		#Addr: addr,<br>		#Handler:    http.HandlerFunc(ServeHTTP),<br>		#ReadTimeout:  time.<span class="hljs-built_in">Duration</span>(httpRunner.ReadTimeout) * time.Second,<br>		#WriteTimeout: time.<span class="hljs-built_in">Duration</span>(httpRunner.WriteTimeout) * time.Second,<br>		<span class="hljs-params">...</span><br>		IdleTimeout:  time.<span class="hljs-built_in">Duration</span>(httpRunner.IdleTimeout) * time.Second,<br>		<span class="hljs-params">...</span><br>		#ConnState:    httpRunner.connState,<br>		#ErrorLog:     syslog.<span class="hljs-literal">New</span>(httpErrorLog&#123;logger&#125;, <span class="hljs-string">&quot;&quot;</span>, <span class="hljs-number">0</span>),<br>	&#125;<br></code></pre></td></tr></table></figure></li>
+</ol>
+<h3 id="问题2-listen-backlog-过低"><a href="#问题2-listen-backlog-过低" class="headerlink" title="问题2: listen backlog 过低"></a>问题2: listen backlog 过低</h3><p>在对服务进行压测时，发现请求如果走nginx会发生阻塞，而直接压测服务却能正常运行，此时发现nginx日志有大量502</p>
+<p>问题解决:</p>
+<ol>
+<li>listen backlog用了默认长度511, listen backlog是长连接队列长度，如果长度过短，容易打满拒绝请求，将backlog长度调大，能进一步提升吞吐。</li>
+</ol>
+<h3 id="问题3-暴力清理nginx日志"><a href="#问题3-暴力清理nginx日志" class="headerlink" title="问题3: 暴力清理nginx日志"></a>问题3: 暴力清理nginx日志</h3><p>通过keepalive配置，502问题确实明显改善了，但是突然过了几天，又偶现了502问题，在排查基础资源监控时发现502的时间点，恰好有磁盘和内存空间骤降；<br>这里定位是因为反向代理的nginx会记录access日志，而我们的服务流量很高access日志容易写满，需要定时清理，清理逻辑：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><code class="hljs bash"><span class="hljs-comment"># crontab</span><br><span class="hljs-built_in">echo</span> &gt; /path/access.log<br></code></pre></td></tr></table></figure>
+<p>这里有个背景说明下:<br>access文件是会被采集程序访问上报到日志平台。上述直接”echo &gt; “ 是可能会导致os.Cache中日志被清理,可能采集程序就会采集不到，出现异常。</p>
+<p>改造逻辑: </p>
+<ul>
+<li>logrotate 10G切割，只保留1个备份文件</li>
+<li>备份文件会等段时间才被清理(当前10min), 保证采集程序能采集成功</li>
+</ul>
+<p>当然也可以自己写逻辑:</p>
+<ol>
+<li>按access.log 10g为切割</li>
+<li>历史文件不会立即被清理会，等待10min，保证采集程序能采集成功</li>
+<li>kill -USR1 nginxpid, 命令nginx重新加载配置。<figure class="highlight routeros"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><code class="hljs routeros"><span class="hljs-attribute">file_path</span>=<span class="hljs-string">&quot;/path/&quot;</span><br><span class="hljs-attribute">log_file</span>=<span class="hljs-string">&quot;access.log&quot;</span><br><span class="hljs-comment">#nginx进程id</span><br><span class="hljs-attribute">nginx_pid</span>=<span class="hljs-string">&quot;/path/nginx.pid &quot;</span><br><span class="hljs-comment">#单位:G</span><br><span class="hljs-attribute">max_log_size</span>=10<br><span class="hljs-comment"># 备份日志最长存活时间 单位:s</span><br><span class="hljs-attribute">max_log_ttl</span>=300<br><br><br><span class="hljs-attribute">timestamp</span>=$(date +%s)<br><span class="hljs-attribute">log_back_file</span>=<span class="hljs-string">&quot;<span class="hljs-variable">$file_path</span><span class="hljs-variable">$log_file</span>-bak-<span class="hljs-variable">$timestamp</span>&quot;</span><br><span class="hljs-comment"># 获取文件大小（以字节为单位）</span><br><span class="hljs-attribute">file_size</span>=$(stat -c <span class="hljs-string">&quot;%s&quot;</span> <span class="hljs-string">&quot;<span class="hljs-variable">$file_path</span><span class="hljs-variable">$log_file</span>&quot;</span>)<br><span class="hljs-attribute">file_size_gb</span>=$(echo <span class="hljs-string">&quot;scale=2; <span class="hljs-variable">$file_size</span> / 1024^3&quot;</span> | bc)<br><span class="hljs-comment"># 判断文件大小是否超过10G</span><br><span class="hljs-keyword">if</span> (( $(echo <span class="hljs-string">&quot;<span class="hljs-variable">$file_size_gb</span> &gt; <span class="hljs-variable">$max_log_size</span> &quot;</span> | bc -l) )); then<br>    mv <span class="hljs-variable">$file_path</span><span class="hljs-variable">$log_file</span>  <span class="hljs-variable">$log_back_file</span><br>    cat <span class="hljs-variable">$nginx_pid</span> | xargs kill -USR1<br>fi<br><br><span class="hljs-comment"># 遍历当前目录下的所有文件</span><br><span class="hljs-keyword">for</span> file <span class="hljs-keyword">in</span> <span class="hljs-string">&quot;<span class="hljs-variable">$file_path</span>/<span class="hljs-variable">$log_file</span>&quot;</span>-bak-*; <span class="hljs-keyword">do</span><br>    # 检查文件是否为普通文件并且修改时间超过10分钟<br>    <span class="hljs-keyword">if</span> [[ -f <span class="hljs-string">&quot;<span class="hljs-variable">$file</span>&quot;</span> &amp;&amp; $(($(date +%s) - $(stat -c %Y <span class="hljs-string">&quot;<span class="hljs-variable">$file</span>&quot;</span>))) -gt <span class="hljs-variable">$max_log_ttl</span> ]]; then<br>        # 删除文件<br>        rm <span class="hljs-string">&quot;<span class="hljs-variable">$file</span>&quot;</span><br>        echo <span class="hljs-string">&quot;已删除文件: <span class="hljs-variable">$file</span>&quot;</span><br>    fi<br>done<br></code></pre></td></tr></table></figure></li>
+</ol>
+<h3 id="优化成果"><a href="#优化成果" class="headerlink" title="优化成果"></a>优化成果</h3><p>之前每天必复现, 连续一周未收到告警<br><img src="/../images/now_502.png" srcset="/img/loading.gif" lazyload alt="img.png"></p>
+
+                
+              </div>
+            
+            <hr/>
+            <div>
+              <div class="post-metas my-3">
+  
+  
+    <div class="post-meta">
+      <i class="iconfont icon-tags"></i>
+      
+        <a href="/tags/Go/" class="print-no-link">#Go</a>
+      
+        <a href="/tags/Nginx/" class="print-no-link">#Nginx</a>
+      
+        <a href="/tags/502/" class="print-no-link">#502</a>
+      
+        <a href="/tags/keepalive/" class="print-no-link">#keepalive</a>
+      
+    </div>
+  
+</div>
+
+
+              
+  
+
+  <div class="license-box my-3">
+    <div class="license-title">
+      <div>go_nginx_502问题排查</div>
+      <div>http://codingwhat.github.io/2024/07/09/go-nginx-502/</div>
+    </div>
+    <div class="license-meta">
+      
+        <div class="license-meta-item">
+          <div>作者</div>
+          <div>codingWhat</div>
+        </div>
+      
+      
+        <div class="license-meta-item license-meta-date">
+          <div>发布于</div>
+          <div>2024年7月9日</div>
+        </div>
+      
+      
+      
+        <div class="license-meta-item">
+          <div>许可协议</div>
+          <div>
+            
+              
+              
+                <a class="print-no-link" target="_blank" href="https://creativecommons.org/licenses/by/4.0/">
+                  <span class="hint--top hint--rounded" aria-label="BY - 署名">
+                    <i class="iconfont icon-by"></i>
+                  </span>
+                </a>
+              
+            
+          </div>
+        </div>
+      
+    </div>
+    <div class="license-icon iconfont"></div>
+  </div>
+
+
+
+              
+                <div class="post-prevnext my-3">
+                  <article class="post-prev col-6">
+                    
+                    
+                      <a href="/2024/07/09/limiter-in-action/" title="限流实战">
+                        <i class="iconfont icon-arrowleft"></i>
+                        <span class="hidden-mobile">限流实战</span>
+                        <span class="visible-mobile">上一篇</span>
+                      </a>
+                    
+                  </article>
+                  <article class="post-next col-6">
+                    
+                    
+                      <a href="/2024/07/08/Understating_GoGC/" title="你了解GoGC么？">
+                        <span class="hidden-mobile">你了解GoGC么？</span>
+                        <span class="visible-mobile">下一篇</span>
+                        <i class="iconfont icon-arrowright"></i>
+                      </a>
+                    
+                  </article>
+                </div>
+              
+            </div>
+
+            
+  
+  
+    <article id="comments" lazyload>
+      
+  <div id="valine"></div>
+  <script type="text/javascript">
+    Fluid.utils.loadComments('#valine', function() {
+      Fluid.utils.createScript('https://lib.baomitu.com/valine/1.5.1/Valine.min.js', function() {
+        var options = Object.assign(
+          {"appId":"bp8GoUBWrJcqrTcWZR7ark7W-gzGzoHsz","appKey":"72QDRB9uHrgahwILCMXUBqo7","path":"window.location.pathname","placeholder":"说点什么","avatar":"retro","meta":["nick","mail","link"],"requiredFields":[],"pageSize":10,"lang":"zh-CN","highlight":false,"recordIP":false,"serverURLs":"","emojiCDN":null,"emojiMaps":null,"enableQQ":false},
+          {
+            el: "#valine",
+            path: window.location.pathname
+          }
+        )
+        new Valine(options);
+        Fluid.utils.waitElementVisible('#valine .vcontent', () => {
+          var imgSelector = '#valine .vcontent img:not(.vemoji)';
+          Fluid.plugins.imageCaption(imgSelector);
+          Fluid.plugins.fancyBox(imgSelector);
+        })
+      });
+    });
+  </script>
+  <noscript>Please enable JavaScript to view the comments</noscript>
+
+
+    </article>
+  
+
+
+          </article>
+        </div>
+      </div>
+    </div>
+
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+  <aside class="sidebar" style="margin-left: -1rem">
+    <div id="toc">
+  <p class="toc-header">
+    <i class="iconfont icon-list"></i>
+    <span>目录</span>
+  </p>
+  <div class="toc-body" id="toc-body"></div>
+</div>
+
+
+
+  </aside>
+
+
+    </div>
+  </div>
+</div>
+
+
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+
+
+
+
+    
+
+    
+      <a id="scroll-top-button" aria-label="TOP" href="#" role="button">
+        <i class="iconfont icon-arrowup" aria-hidden="true"></i>
+      </a>
+    
+
+    
+      <div class="modal fade" id="modalSearch" tabindex="-1" role="dialog" aria-labelledby="ModalLabel"
+     aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header text-center">
+        <h4 class="modal-title w-100 font-weight-bold">搜索</h4>
+        <button type="button" id="local-search-close" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body mx-3">
+        <div class="md-form mb-5">
+          <input type="text" id="local-search-input" class="form-control validate">
+          <label data-error="x" data-success="v" for="local-search-input">关键词</label>
+        </div>
+        <div class="list-group" id="local-search-result"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+    
+
+    
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+  
+    <div class="footer-content">
+       <a href="https://hexo.io" target="_blank" rel="nofollow noopener"><span>Hexo</span></a> <i class="iconfont icon-love"></i> <a href="https://github.com/fluid-dev/hexo-theme-fluid" target="_blank" rel="nofollow noopener"><span>Coding What</span></a> 
+    </div>
+  
+  
+    <div class="statistics">
+  
+  
+
+  
+    
+      <span id="leancloud-site-pv-container" style="display: none">
+        总访问量 
+        <span id="leancloud-site-pv"></span>
+         次
+      </span>
+    
+    
+      <span id="leancloud-site-uv-container" style="display: none">
+        总访客数 
+        <span id="leancloud-site-uv"></span>
+         人
+      </span>
+    
+    
+
+  
+</div>
+
+  
+  
+  
+</div>
+
+  </footer>
+
+  <!-- Scripts -->
+  
+  <script  src="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.js" ></script>
+  <link  rel="stylesheet" href="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.css" />
+
+  <script>
+    NProgress.configure({"showSpinner":false,"trickleSpeed":100})
+    NProgress.start()
+    window.addEventListener('load', function() {
+      NProgress.done();
+    })
+  </script>
+
+
+<script  src="https://lib.baomitu.com/jquery/3.6.4/jquery.min.js" ></script>
+<script  src="https://lib.baomitu.com/twitter-bootstrap/4.6.1/js/bootstrap.min.js" ></script>
+<script  src="/js/events.js" ></script>
+<script  src="/js/plugins.js" ></script>
+
+
+  <script  src="https://lib.baomitu.com/typed.js/2.0.12/typed.min.js" ></script>
+  <script>
+    (function (window, document) {
+      var typing = Fluid.plugins.typing;
+      var subtitle = document.getElementById('subtitle');
+      if (!subtitle || !typing) {
+        return;
+      }
+      var text = subtitle.getAttribute('data-typed-text');
+      
+        typing(text);
+      
+    })(window, document);
+  </script>
+
+
+
+
+  
+    <script  src="/js/img-lazyload.js" ></script>
+  
+
+
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/tocbot/4.20.1/tocbot.min.js', function() {
+    var toc = jQuery('#toc');
+    if (toc.length === 0 || !window.tocbot) { return; }
+    var boardCtn = jQuery('#board-ctn');
+    var boardTop = boardCtn.offset().top;
+
+    window.tocbot.init(Object.assign({
+      tocSelector     : '#toc-body',
+      contentSelector : '.markdown-body',
+      linkClass       : 'tocbot-link',
+      activeLinkClass : 'tocbot-active-link',
+      listClass       : 'tocbot-list',
+      isCollapsedClass: 'tocbot-is-collapsed',
+      collapsibleClass: 'tocbot-is-collapsible',
+      scrollSmooth    : true,
+      includeTitleTags: true,
+      headingsOffset  : -boardTop,
+    }, CONFIG.toc));
+    if (toc.find('.toc-list-item').length > 0) {
+      toc.css('visibility', 'visible');
+    }
+
+    Fluid.events.registerRefreshCallback(function() {
+      if ('tocbot' in window) {
+        tocbot.refresh();
+        var toc = jQuery('#toc');
+        if (toc.length === 0 || !tocbot) {
+          return;
+        }
+        if (toc.find('.toc-list-item').length > 0) {
+          toc.css('visibility', 'visible');
+        }
+      }
+    });
+  });
+</script>
+
+
+  <script src=https://lib.baomitu.com/clipboard.js/2.0.11/clipboard.min.js></script>
+
+  <script>Fluid.plugins.codeWidget();</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/anchor-js/4.3.1/anchor.min.js', function() {
+    window.anchors.options = {
+      placement: CONFIG.anchorjs.placement,
+      visible  : CONFIG.anchorjs.visible
+    };
+    if (CONFIG.anchorjs.icon) {
+      window.anchors.options.icon = CONFIG.anchorjs.icon;
+    }
+    var el = (CONFIG.anchorjs.element || 'h1,h2,h3,h4,h5,h6').split(',');
+    var res = [];
+    for (var item of el) {
+      res.push('.markdown-body > ' + item.trim());
+    }
+    if (CONFIG.anchorjs.placement === 'left') {
+      window.anchors.options.class = 'anchorjs-link-left';
+    }
+    window.anchors.add(res.join(', '));
+
+    Fluid.events.registerRefreshCallback(function() {
+      if ('anchors' in window) {
+        anchors.removeAll();
+        var el = (CONFIG.anchorjs.element || 'h1,h2,h3,h4,h5,h6').split(',');
+        var res = [];
+        for (var item of el) {
+          res.push('.markdown-body > ' + item.trim());
+        }
+        if (CONFIG.anchorjs.placement === 'left') {
+          anchors.options.class = 'anchorjs-link-left';
+        }
+        anchors.add(res.join(', '));
+      }
+    });
+  });
+</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.js', function() {
+    Fluid.plugins.fancyBox();
+  });
+</script>
+
+
+  <script>Fluid.plugins.imageCaption();</script>
+
+  <script defer src="/js/leancloud.js" ></script>
+
+  <script  src="/js/local-search.js" ></script>
+
+
+
+
+
+<!-- 主题的启动项，将它保持在最底部 -->
+<!-- the boot of the theme, keep it at the bottom -->
+<script  src="/js/boot.js" ></script>
+
+
+  
+
+  <noscript>
+    <div class="noscript-warning">博客在允许 JavaScript 运行的环境下浏览效果更佳</div>
+  </noscript>
+</body>
+</html>

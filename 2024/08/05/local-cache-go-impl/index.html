@@ -1,0 +1,941 @@
+
+
+<!DOCTYPE html>
+<html lang="zh-CN" data-default-color-scheme=auto>
+
+
+
+<head>
+  <meta charset="UTF-8">
+  <link rel="apple-touch-icon" sizes="76x76" href="/img/fluid.png">
+  <link rel="icon" href="/img/fluid.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, shrink-to-fit=no">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  
+  <meta name="theme-color" content="#2f4154">
+  <meta name="author" content="codingWhat">
+  <meta name="keywords" content="evanhan codingWhat 博客 韩伟的博客 系统设计 后端开发">
+  
+    <meta name="description" content="在日常高流量场景中(读多写少场景)，经常会使用本地缓存来应对热点流量，保障系统的稳定。可是你有没有好奇过它底层是怎么实现的？数据是如何管理的？如果你来设计一个缓存库，你会如何设计?">
+<meta property="og:type" content="article">
+<meta property="og:title" content="实现高性能的本地缓存库">
+<meta property="og:url" content="http://codingwhat.github.io/2024/08/05/local-cache-go-impl/index.html">
+<meta property="og:site_name" content="codingWhat Blog">
+<meta property="og:description" content="在日常高流量场景中(读多写少场景)，经常会使用本地缓存来应对热点流量，保障系统的稳定。可是你有没有好奇过它底层是怎么实现的？数据是如何管理的？如果你来设计一个缓存库，你会如何设计?">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://codingwhat.github.io/images/hash_func.png">
+<meta property="article:published_time" content="2024-08-05T14:40:01.000Z">
+<meta property="article:modified_time" content="2024-08-13T07:06:56.795Z">
+<meta property="article:author" content="codingWhat">
+<meta property="article:tag" content="GO">
+<meta property="article:tag" content="本地缓存">
+<meta property="article:tag" content="LRU">
+<meta property="article:tag" content="高性能">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="http://codingwhat.github.io/images/hash_func.png">
+  
+  
+  
+  <title>实现高性能的本地缓存库 - codingWhat Blog</title>
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/twitter-bootstrap/4.6.1/css/bootstrap.min.css" />
+
+
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/github-markdown-css/4.0.0/github-markdown.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/hint.css/2.7.0/hint.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.css" />
+
+
+
+<!-- 主题依赖的图标库，不要自行修改 -->
+<!-- Do not modify the link that theme dependent icons -->
+
+<link rel="stylesheet" href="//at.alicdn.com/t/font_1749284_hj8rtnfg7um.css">
+
+
+
+<link rel="stylesheet" href="//at.alicdn.com/t/font_1736178_lbnruvf0jn.css">
+
+
+<link  rel="stylesheet" href="/css/main.css" />
+
+
+  <link id="highlight-css" rel="stylesheet" href="/css/highlight.css" />
+  
+    <link id="highlight-css-dark" rel="stylesheet" href="/css/highlight-dark.css" />
+  
+
+
+
+
+  <script id="fluid-configs">
+    var Fluid = window.Fluid || {};
+    Fluid.ctx = Object.assign({}, Fluid.ctx)
+    var CONFIG = {"hostname":"codingwhat.github.io","root":"/","version":"1.9.7","typing":{"enable":true,"typeSpeed":70,"cursorChar":"_","loop":false,"scope":[]},"anchorjs":{"enable":true,"element":"h1,h2,h3,h4,h5,h6","placement":"left","visible":"hover","icon":""},"progressbar":{"enable":true,"height_px":3,"color":"#29d","options":{"showSpinner":false,"trickleSpeed":100}},"code_language":{"enable":true,"default":"TEXT"},"copy_btn":true,"image_caption":{"enable":true},"image_zoom":{"enable":true,"img_url_replace":["",""]},"toc":{"enable":true,"placement":"right","headingSelector":"h1,h2,h3,h4,h5,h6","collapseDepth":0},"lazyload":{"enable":true,"loading_img":"/img/loading.gif","onlypost":false,"offset_factor":2},"web_analytics":{"enable":true,"follow_dnt":true,"baidu":null,"google":{"measurement_id":null},"tencent":{"sid":null,"cid":null},"woyaola":null,"cnzz":null,"leancloud":{"app_id":"bp8GoUBWrJcqrTcWZR7ark7W-gzGzoHsz","app_key":"72QDRB9uHrgahwILCMXUBqo7","server_url":"https://bp8goubw.lc-cn-n1-shared.com","path":"window.location.pathname","ignore_local":false}},"search_path":"/local-search.xml","include_content_in_search":true};
+
+    if (CONFIG.web_analytics.follow_dnt) {
+      var dntVal = navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack;
+      Fluid.ctx.dnt = dntVal && (dntVal.startsWith('1') || dntVal.startsWith('yes') || dntVal.startsWith('on'));
+    }
+  </script>
+  <script  src="/js/utils.js" ></script>
+  <script  src="/js/color-schema.js" ></script>
+  
+
+  
+
+  
+    <!-- Google tag (gtag.js) -->
+    <script async>
+      if (!Fluid.ctx.dnt) {
+        Fluid.utils.createScript("https://www.googletagmanager.com/gtag/js?id=", function() {
+          window.dataLayer = window.dataLayer || [];
+          function gtag() {
+            dataLayer.push(arguments);
+          }
+          gtag('js', new Date());
+          gtag('config', '');
+        });
+      }
+    </script>
+  
+
+  
+
+  
+
+  
+
+  
+    
+  
+
+
+
+  
+<meta name="generator" content="Hexo 7.3.0"></head>
+
+
+<body>
+  
+
+  <header>
+    
+
+<div class="header-inner" style="height: 70vh;">
+  <nav id="navbar" class="navbar fixed-top  navbar-expand-lg navbar-dark scrolling-navbar">
+  <div class="container">
+    <a class="navbar-brand" href="/">
+      <strong>Coding What Blog</strong>
+    </a>
+
+    <button id="navbar-toggler-btn" class="navbar-toggler" type="button" data-toggle="collapse"
+            data-target="#navbarSupportedContent"
+            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+      <div class="animated-icon"><span></span><span></span><span></span></div>
+    </button>
+
+    <!-- Collapsible content -->
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      <ul class="navbar-nav ml-auto text-center">
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/" target="_self">
+                <i class="iconfont icon-home-fill"></i>
+                <span>首页</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/archives/" target="_self">
+                <i class="iconfont icon-archive-fill"></i>
+                <span>归档</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/categories/" target="_self">
+                <i class="iconfont icon-category-fill"></i>
+                <span>分类</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/tags/" target="_self">
+                <i class="iconfont icon-tags-fill"></i>
+                <span>标签</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/about/" target="_self">
+                <i class="iconfont icon-user-fill"></i>
+                <span>关于</span>
+              </a>
+            </li>
+          
+        
+        
+          <li class="nav-item" id="search-btn">
+            <a class="nav-link" target="_self" href="javascript:;" data-toggle="modal" data-target="#modalSearch" aria-label="Search">
+              <i class="iconfont icon-search"></i>
+            </a>
+          </li>
+          
+        
+        
+          <li class="nav-item" id="color-toggle-btn">
+            <a class="nav-link" target="_self" href="javascript:;" aria-label="Color Toggle">
+              <i class="iconfont icon-dark" id="color-toggle-icon"></i>
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</nav>
+
+  
+
+<div id="banner" class="banner" parallax=true
+     style="background: url('/img/default.png') no-repeat center center; background-size: cover;">
+  <div class="full-bg-img">
+    <div class="mask flex-center" style="background-color: rgba(0, 0, 0, 0.3)">
+      <div class="banner-text text-center fade-in-up">
+        <div class="h2">
+          
+            <span id="subtitle" data-typed-text="实现高性能的本地缓存库"></span>
+          
+        </div>
+
+        
+          
+  <div class="mt-3">
+    
+    
+      <span class="post-meta">
+        <i class="iconfont icon-date-fill" aria-hidden="true"></i>
+        <time datetime="2024-08-05 22:40" pubdate>
+          2024年8月5日 晚上
+        </time>
+      </span>
+    
+  </div>
+
+  <div class="mt-1">
+    
+      <span class="post-meta mr-2">
+        <i class="iconfont icon-chart"></i>
+        
+          1.8k 字
+        
+      </span>
+    
+
+    
+      <span class="post-meta mr-2">
+        <i class="iconfont icon-clock-fill"></i>
+        
+        
+        
+          15 分钟
+        
+      </span>
+    
+
+    
+    
+      
+        <span id="leancloud-page-views-container" class="post-meta" style="display: none">
+          <i class="iconfont icon-eye" aria-hidden="true"></i>
+          <span id="leancloud-page-views"></span> 次
+        </span>
+        
+      
+    
+  </div>
+
+
+        
+      </div>
+
+      
+    </div>
+  </div>
+</div>
+
+</div>
+
+  </header>
+
+  <main>
+    
+      
+
+<div class="container-fluid nopadding-x">
+  <div class="row nomargin-x">
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+
+    </div>
+
+    <div class="col-lg-8 nopadding-x-md">
+      <div class="container nopadding-x-md" id="board-ctn">
+        <div id="board">
+          <article class="post-content mx-auto">
+            <h1 id="seo-header">实现高性能的本地缓存库</h1>
+            
+            
+              <div class="markdown-body">
+                
+                <blockquote>
+<p>在日常高流量场景中(读多写少场景)，经常会使用本地缓存来应对热点流量，保障系统的稳定。可是你有没有好奇过它底层是怎么实现的？数据是如何管理的？如果你来设计一个缓存库，你会如何设计?</p>
+</blockquote>
+<span id="more"></span>
+
+
+<h1 id="他山之石，可以攻玉"><a href="#他山之石，可以攻玉" class="headerlink" title="他山之石，可以攻玉"></a>他山之石，可以攻玉</h1><p>在开始之前，借助开源社区了解主流缓存库的种类、设计思想以及适用场景是一个明智的做法。通过这样的调研，可以了解到不同缓存库的特点和优势，并从中汲取经验，以设计出符合自己需求的缓存库。 为了方便学习和理解，我对主流库做了详细调研并整理出以下多维度对比图，帮助你更清晰地了解不同缓存库之间的差异和优势。</p>
+<table>
+<thead>
+<tr>
+<th>缓存库</th>
+<th>社区活跃度</th>
+<th>过期时间</th>
+<th>GC</th>
+<th>无GC实现原理</th>
+<th>设计原理</th>
+<th>淘汰机制</th>
+<th>设计缺陷</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>freecache</td>
+<td>start:5k,fork:390</td>
+<td>支持</td>
+<td><font color="red"> Zero GC</font></td>
+<td>减少指针数，固定512个(256个segment，每个segment两个指针,RingBuf、[]entryPtr)</td>
+<td>(分片+互斥锁) + 内置map + slice + ringbuffer</td>
+<td>LRU</td>
+<td>不支持自动扩容</td>
+</tr>
+<tr>
+<td>bigcache</td>
+<td>start:7.4k,fork:591</td>
+<td>支持</td>
+<td><font color="red"> Zero GC</font></td>
+<td>无指针的map, map[uint64]uint32</td>
+<td>(分片+读写锁) + map[uint64]uint32 + fifo-buffer</td>
+<td>FIFO</td>
+<td>不支持对key设置过期时间</td>
+</tr>
+<tr>
+<td>fastcache</td>
+<td>start:2.1k,fork:175</td>
+<td>不支持</td>
+<td><font color="red"> Zero GC</font></td>
+<td>无指针的map, map[uint64]uint32</td>
+<td>(分片+读写锁) + map[uint64]uint64 + ringbuffer(chunks [][]byte)</td>
+<td>FIFO</td>
+<td>不支持过期时间</td>
+</tr>
+<tr>
+<td>groupcache</td>
+<td>start:12.9k,fork:1.4k</td>
+<td>不支持</td>
+<td>GoGC</td>
+<td>-</td>
+<td>全局读写锁+LRU链表</td>
+<td>LRU</td>
+<td>不支持过期时间</td>
+</tr>
+<tr>
+<td>go-cache</td>
+<td>start:8k,fork:865</td>
+<td>支持</td>
+<td>GoGC</td>
+<td>-</td>
+<td>全局读写锁 + map[string]item</td>
+<td>定期清理过期数据</td>
+<td>锁竞争严重</td>
+</tr>
+<tr>
+<td>ristretto</td>
+<td>start:5.5k,fork:365</td>
+<td>支持</td>
+<td>GoGC</td>
+<td>-</td>
+<td>分片+读写锁</td>
+<td>TinyLFU&#x2F;SampledLFU，expireMap: map[timestamp]bucket, 一个周期对应一个bucket, 定期清理过期的bucket</td>
+<td>-</td>
+</tr>
+<tr>
+<td>offheap</td>
+<td>start:363,fork:37</td>
+<td>不支持</td>
+<td><font color="red"> Zero GC</font></td>
+<td>堆外内存，syscall.Mmap</td>
+<td>内置HashTable  + syscall.Mmap</td>
+<td>-</td>
+<td>冲突时通过本地探测法，影响性能</td>
+</tr>
+</tbody></table>
+<p>上述中比较有意思的是Zero-Gc这个概念，我总结下关键信息:<br><strong>如何实现Zero-GC?</strong></p>
+<ol>
+<li>完全避免GC: 采用syscall.MMap申请堆外内存，gc就不会扫描</li>
+<li>规避GC扫描策略: 数组(固定了指针数量) + 非指针map[uint64]uint32 + []byte(参考freecache) 或者 slice + 非指针的map + ringbuffer(参考bigcache)</li>
+</ol>
+<p><strong>如何选择？</strong><br>就笔者的经验来看，比如在http服务中，从缓存库读取[]byte内容，写入socket，这种场景Zero-GC库确实很高效比较适合(这也正是bigCache诞生的背景)。但是在业务逻辑中的海量操作都要经过序列化是不可接受的，会占用很多cpu资源，而非zero-gc就算gc会影响程序的性能，但是缓存项毕竟会淘汰不是无限的，再加上go现在的gc优化的也不错，所以权衡之下优先采用非Zero-GC库。</p>
+<p>综上，没有一个缓存库适用于所有场景和问题, 每个缓存库的诞生都是为了解决特定场景下的特定问题。 这些问题主要分为以下几类:</p>
+<ul>
+<li>锁竞争。全局锁导致大量请求都在抢锁、休眠，严重影响性能</li>
+<li>数据淘汰。内存资源有限，必须要按特定策略淘汰数据</li>
+<li>GC问题。存储海量对象时，GC扫描的影响不容小觑</li>
+</ul>
+<hr>
+<h1 id="实践出真知"><a href="#实践出真知" class="headerlink" title="实践出真知"></a>实践出真知</h1><p>接下来围绕上述三个问题来设计我们自己的高性能本地缓存库。</p>
+<h2 id="设计目标"><a href="#设计目标" class="headerlink" title="设计目标"></a>设计目标</h2><ul>
+<li>高性能, 减少锁竞争</li>
+<li>使用简单，配置不能太复杂，要开箱即用</li>
+<li>支持按key设置过期时间</li>
+<li>支持自动淘汰(LRU)</li>
+<li>不要求Zero-GC, 但也应该尽量减少GC</li>
+</ul>
+<h2 id="设计思路"><a href="#设计思路" class="headerlink" title="设计思路"></a>设计思路</h2><ul>
+<li>锁竞争: 读写锁 + 数据分片</li>
+<li>数据淘汰: LRU</li>
+<li>高性能: 合并写操作; 批量更新;</li>
+<li>GC优化: 我们的目标是减少GC，尽量减少对象分配</li>
+</ul>
+<h2 id="详细设计"><a href="#详细设计" class="headerlink" title="详细设计"></a>详细设计</h2><h3 id="API设计"><a href="#API设计" class="headerlink" title="API设计"></a>API设计</h3><figure class="highlight golang"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><code class="hljs golang"><br><span class="hljs-keyword">type</span> Cache <span class="hljs-keyword">interface</span> &#123;<br>	Set(k <span class="hljs-type">string</span>, v any, ttl time.Duration) <span class="hljs-type">bool</span><br>	Get(k <span class="hljs-type">string</span>) (v any, err <span class="hljs-type">error</span>)<br>	Del(k <span class="hljs-type">string</span>)<br>	Len() <span class="hljs-type">uint64</span><br>	Close()<br>&#125;<br></code></pre></td></tr></table></figure>
+<h3 id="核心数据结构"><a href="#核心数据结构" class="headerlink" title="核心数据结构"></a>核心数据结构</h3><h4 id="cache"><a href="#cache" class="headerlink" title="cache"></a>cache</h4><p>cache中核心结构为store、policy、expireKeyTimers模块, store负责存储引擎的实现，policy负责淘汰机制，expireKeyTimers管理过期清理的定时任务，这三者共同组成了缓存库基础骨架。</p>
+<figure class="highlight golang"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><code class="hljs golang"><span class="hljs-keyword">type</span> cache <span class="hljs-keyword">struct</span> &#123;<br>	size <span class="hljs-type">int</span><br><br>	store            store   <span class="hljs-comment">// 读写锁 + 数据分片</span><br>	policy           policy  <span class="hljs-comment">//链表淘汰策略，LRU等</span><br>	ekt              *expireKeyTimers <span class="hljs-comment">//维护key的定期清理任务</span><br>	accessUniqBuffer *uniqRingBuffer <span class="hljs-comment">// 合并Get操作，降低对链表的移动</span><br><br>	accessEvtCh <span class="hljs-keyword">chan</span> []*list.Element <span class="hljs-comment">//批量Get操作，支持批量更新链表</span><br>	updateEvtCh <span class="hljs-keyword">chan</span> *entExtendFunc  <span class="hljs-comment">//合并对链表的Update</span><br>	addEvtCh    <span class="hljs-keyword">chan</span> *entExtendFunc  <span class="hljs-comment">//合并写操作(包含链表和map)</span><br>	delEvtCh    <span class="hljs-keyword">chan</span> *keyExtendFunc  <span class="hljs-comment">//合并对链表的Del</span><br><br>	isSync     <span class="hljs-type">bool</span> <span class="hljs-comment">//同步标识，会阻塞等待至写成功之后</span><br>	setTimeout time.Duration <span class="hljs-comment">//阻塞等待超时时间</span><br>&#125;<br></code></pre></td></tr></table></figure>
+<h4 id="store-存储引擎实现"><a href="#store-存储引擎实现" class="headerlink" title="store - 存储引擎实现"></a>store - 存储引擎实现</h4><p>store 提供增删改查的接口，可以根据自己的需求实现对应的接口，比如我们这里用就是shardedMap, 通过分片来降低锁的粒度, 减少锁竞争。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><code class="hljs azure">type store interface &#123;<br>    set(k string, v any)<br>    get(k string) (any, bool)<br>    del(k string)<br>    len() uint64<br>    clear()<br>&#125;<br>type shardedMap struct &#123;<br>    shards []*safeMap<br>&#125;<br>    <br>type safeMap struct &#123;<br>	mu   sync.RWMutex<br>	data map[string]any<br>&#125;<br><br></code></pre></td></tr></table></figure>
+
+<h4 id="policy-淘汰机制"><a href="#policy-淘汰机制" class="headerlink" title="policy - 淘汰机制"></a>policy - 淘汰机制</h4><p>淘汰机制主要是在对数据增删改查时，通过一定的策略来移动链表元素，以保证活跃的缓存项留在内存中，同时淘汰不活跃的缓存项。常见淘汰策略有LRU、LFU等。LRU较简单，可以通过标准库中的list实现policy接口实现。</p>
+<figure class="highlight golang"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><code class="hljs golang"><span class="hljs-comment">// 缓存项，包含 key,value,过期时间</span><br><span class="hljs-keyword">type</span> entry <span class="hljs-keyword">struct</span> &#123;<br>    key      <span class="hljs-type">string</span><br>    val      any<br>    expireAt time.Time<br>    mu sync.RWMutex<br>&#125;<br><span class="hljs-keyword">type</span> policy <span class="hljs-keyword">interface</span> &#123;<br>	isFull() <span class="hljs-type">bool</span><br>	add(*entry) (*list.Element, *list.Element) <span class="hljs-comment">// 返回新增, victim:淘汰的entry</span><br>	remove(*list.Element)<br>	update(*entry, *list.Element)<br>	renew(*list.Element)<br>	batchRenew([]*list.Element)<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<h4 id="expireKeyTimers-过期时间"><a href="#expireKeyTimers-过期时间" class="headerlink" title="expireKeyTimers - 过期时间"></a>expireKeyTimers - 过期时间</h4><p>这个模块主要维护过期key的定时清理任务。底层主要依赖第三方<a target="_blank" rel="noopener" href="https://github.com/RussellLuo/timingwheel">时间轮库</a>来管理定时任务</p>
+<figure class="highlight golang"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><code class="hljs golang"><span class="hljs-keyword">type</span> expireKeyTimers <span class="hljs-keyword">struct</span> &#123;<br>	mu     sync.RWMutex<br>	timers <span class="hljs-keyword">map</span>[<span class="hljs-type">string</span>]*timingwheel.Timer<br><br>	tick      time.Duration<br>	wheelSize <span class="hljs-type">int64</span><br>	tw        *timingwheel.TimingWheel<br>&#125;<br></code></pre></td></tr></table></figure>
+<h3 id="hash函数选型"><a href="#hash函数选型" class="headerlink" title="hash函数选型"></a>hash函数选型</h3><p><a target="_blank" rel="noopener" href="https://github.com/smallnest/hash-bench">常见hash函数压测对比</a><br><img src="/images/hash_func.png" srcset="/img/loading.gif" lazyload alt="常见hash函数"></p>
+<hr>
+<p>fnv64 vs xxhash<br>测试机器: mac-m1, go benchmark结果</p>
+<table>
+<thead>
+<tr>
+<th>hash函数</th>
+<th>fnv64a</th>
+<th>github.com&#x2F;cespare&#x2F;xxhash&#x2F;v2</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>8字节</td>
+<td>5.130 ns&#x2F;op</td>
+<td>8.817 ns&#x2F;op</td>
+</tr>
+<tr>
+<td>16字节</td>
+<td>7.928 ns&#x2F;op</td>
+<td>7.464 ns&#x2F;op</td>
+</tr>
+<tr>
+<td>32字节</td>
+<td>17.17 ns&#x2F;op</td>
+<td>14.22 ns&#x2F;op</td>
+</tr>
+</tbody></table>
+<h3 id="高性能优化"><a href="#高性能优化" class="headerlink" title="高性能优化"></a>高性能优化</h3><h4 id="写操作"><a href="#写操作" class="headerlink" title="写操作"></a>写操作</h4><p><strong>隔离:</strong>  按channel隔离增、删、改<br><strong>同步转异步:</strong>  链表并发写操作，改为异步单协程更新<br><strong>支持非阻塞</strong></p>
+<h4 id="读操作"><a href="#读操作" class="headerlink" title="读操作"></a>读操作</h4><p><strong>批量操作:</strong> 采用ringbuffer，批量更新链表</p>
+<h4 id="内存优化"><a href="#内存优化" class="headerlink" title="内存优化"></a>内存优化</h4><p>采用sync.Pool池化ringbuffer对象，避免频繁创建对象</p>
+<h2 id="压测对比"><a href="#压测对比" class="headerlink" title="压测对比"></a>压测对比</h2><p><a target="_blank" rel="noopener" href="https://github.com/codingWhat/armory/tree/main/cache/localcache">代码地址</a></p>
+<table>
+<thead>
+<tr>
+<th>压测case</th>
+<th>操作次数</th>
+<th>单次耗时</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>BenchmarkSyncMapSetParallelForStruct-10</td>
+<td>1330215</td>
+<td>907.6 ns&#x2F;op</td>
+</tr>
+<tr>
+<td>BenchmarkFreeCacheSetParallelForStruct-10</td>
+<td>2191702</td>
+<td>549.8 ns&#x2F;op</td>
+</tr>
+<tr>
+<td>BenchmarkBigCacheSetParallelForStruct-10</td>
+<td>2250765</td>
+<td>528.6 ns&#x2F;op</td>
+</tr>
+<tr>
+<td><strong>BenchmarkLCSetParallelForStruct-10</strong></td>
+<td>590721</td>
+<td>2114 ns&#x2F;op</td>
+</tr>
+<tr>
+<td>BenchmarkSyncMapGetParallelForStruct-10</td>
+<td>3960368</td>
+<td>313.6 ns&#x2F;op</td>
+</tr>
+<tr>
+<td>BenchmarkFreeCacheGetParallelForStruct-10</td>
+<td>2146406</td>
+<td>545.5 ns&#x2F;op</td>
+</tr>
+<tr>
+<td>BenchmarkBigCacheGetParallelForStruct-10</td>
+<td>2329698</td>
+<td>516.4 ns&#x2F;op</td>
+</tr>
+<tr>
+<td><strong>BenchmarkLCGetParallelForStruct-10</strong></td>
+<td>2386426</td>
+<td>475.1 ns&#x2F;op</td>
+</tr>
+</tbody></table>
+<p>经过压测分析，在写入数据由于我们采用的是同步模式，对比其他库有一些弱势，但是在读取时由于不需要序列化操作，相比Zero-Gc要快些。</p>
+<h2 id="未来展望"><a href="#未来展望" class="headerlink" title="未来展望"></a>未来展望</h2><p>从上述压测结果可以分析得出在高并发写场景下，跟其他主流库相比吞吐较低，主要原因是因为底层channel并发操作性能不佳，虽说本地缓存面向的是读多写少的场景，但如果有些场景对写的要求很高，可以用无锁队列替换。</p>
+
+                
+              </div>
+            
+            <hr/>
+            <div>
+              <div class="post-metas my-3">
+  
+  
+    <div class="post-meta">
+      <i class="iconfont icon-tags"></i>
+      
+        <a href="/tags/GO/" class="print-no-link">#GO</a>
+      
+        <a href="/tags/%E6%9C%AC%E5%9C%B0%E7%BC%93%E5%AD%98/" class="print-no-link">#本地缓存</a>
+      
+        <a href="/tags/LRU/" class="print-no-link">#LRU</a>
+      
+        <a href="/tags/%E9%AB%98%E6%80%A7%E8%83%BD/" class="print-no-link">#高性能</a>
+      
+    </div>
+  
+</div>
+
+
+              
+  
+
+  <div class="license-box my-3">
+    <div class="license-title">
+      <div>实现高性能的本地缓存库</div>
+      <div>http://codingwhat.github.io/2024/08/05/local-cache-go-impl/</div>
+    </div>
+    <div class="license-meta">
+      
+        <div class="license-meta-item">
+          <div>作者</div>
+          <div>codingWhat</div>
+        </div>
+      
+      
+        <div class="license-meta-item license-meta-date">
+          <div>发布于</div>
+          <div>2024年8月5日</div>
+        </div>
+      
+      
+      
+        <div class="license-meta-item">
+          <div>许可协议</div>
+          <div>
+            
+              
+              
+                <a class="print-no-link" target="_blank" href="https://creativecommons.org/licenses/by/4.0/">
+                  <span class="hint--top hint--rounded" aria-label="BY - 署名">
+                    <i class="iconfont icon-by"></i>
+                  </span>
+                </a>
+              
+            
+          </div>
+        </div>
+      
+    </div>
+    <div class="license-icon iconfont"></div>
+  </div>
+
+
+
+              
+                <div class="post-prevnext my-3">
+                  <article class="post-prev col-6">
+                    
+                    
+                      <a href="/2024/08/09/gmp-understanding/" title="GMP学习总结">
+                        <i class="iconfont icon-arrowleft"></i>
+                        <span class="hidden-mobile">GMP学习总结</span>
+                        <span class="visible-mobile">上一篇</span>
+                      </a>
+                    
+                  </article>
+                  <article class="post-next col-6">
+                    
+                    
+                      <a href="/2024/07/28/service-avaliable/" title="服务可用性-理论篇">
+                        <span class="hidden-mobile">服务可用性-理论篇</span>
+                        <span class="visible-mobile">下一篇</span>
+                        <i class="iconfont icon-arrowright"></i>
+                      </a>
+                    
+                  </article>
+                </div>
+              
+            </div>
+
+            
+  
+  
+    <article id="comments" lazyload>
+      
+  <div id="valine"></div>
+  <script type="text/javascript">
+    Fluid.utils.loadComments('#valine', function() {
+      Fluid.utils.createScript('https://lib.baomitu.com/valine/1.5.1/Valine.min.js', function() {
+        var options = Object.assign(
+          {"appId":"bp8GoUBWrJcqrTcWZR7ark7W-gzGzoHsz","appKey":"72QDRB9uHrgahwILCMXUBqo7","path":"window.location.pathname","placeholder":"说点什么","avatar":"retro","meta":["nick","mail","link"],"requiredFields":[],"pageSize":10,"lang":"zh-CN","highlight":false,"recordIP":false,"serverURLs":"","emojiCDN":null,"emojiMaps":null,"enableQQ":false},
+          {
+            el: "#valine",
+            path: window.location.pathname
+          }
+        )
+        new Valine(options);
+        Fluid.utils.waitElementVisible('#valine .vcontent', () => {
+          var imgSelector = '#valine .vcontent img:not(.vemoji)';
+          Fluid.plugins.imageCaption(imgSelector);
+          Fluid.plugins.fancyBox(imgSelector);
+        })
+      });
+    });
+  </script>
+  <noscript>Please enable JavaScript to view the comments</noscript>
+
+
+    </article>
+  
+
+
+          </article>
+        </div>
+      </div>
+    </div>
+
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+  <aside class="sidebar" style="margin-left: -1rem">
+    <div id="toc">
+  <p class="toc-header">
+    <i class="iconfont icon-list"></i>
+    <span>目录</span>
+  </p>
+  <div class="toc-body" id="toc-body"></div>
+</div>
+
+
+
+  </aside>
+
+
+    </div>
+  </div>
+</div>
+
+
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+
+
+
+
+    
+
+    
+      <a id="scroll-top-button" aria-label="TOP" href="#" role="button">
+        <i class="iconfont icon-arrowup" aria-hidden="true"></i>
+      </a>
+    
+
+    
+      <div class="modal fade" id="modalSearch" tabindex="-1" role="dialog" aria-labelledby="ModalLabel"
+     aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header text-center">
+        <h4 class="modal-title w-100 font-weight-bold">搜索</h4>
+        <button type="button" id="local-search-close" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body mx-3">
+        <div class="md-form mb-5">
+          <input type="text" id="local-search-input" class="form-control validate">
+          <label data-error="x" data-success="v" for="local-search-input">关键词</label>
+        </div>
+        <div class="list-group" id="local-search-result"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+    
+
+    
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+  
+    <div class="footer-content">
+       <a href="https://hexo.io" target="_blank" rel="nofollow noopener"><span>Hexo</span></a> <i class="iconfont icon-love"></i> <a href="https://github.com/fluid-dev/hexo-theme-fluid" target="_blank" rel="nofollow noopener"><span>Coding What</span></a> 
+    </div>
+  
+  
+    <div class="statistics">
+  
+  
+
+  
+    
+      <span id="leancloud-site-pv-container" style="display: none">
+        总访问量 
+        <span id="leancloud-site-pv"></span>
+         次
+      </span>
+    
+    
+      <span id="leancloud-site-uv-container" style="display: none">
+        总访客数 
+        <span id="leancloud-site-uv"></span>
+         人
+      </span>
+    
+    
+
+  
+</div>
+
+  
+  
+  
+</div>
+
+  </footer>
+
+  <!-- Scripts -->
+  
+  <script  src="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.js" ></script>
+  <link  rel="stylesheet" href="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.css" />
+
+  <script>
+    NProgress.configure({"showSpinner":false,"trickleSpeed":100})
+    NProgress.start()
+    window.addEventListener('load', function() {
+      NProgress.done();
+    })
+  </script>
+
+
+<script  src="https://lib.baomitu.com/jquery/3.6.4/jquery.min.js" ></script>
+<script  src="https://lib.baomitu.com/twitter-bootstrap/4.6.1/js/bootstrap.min.js" ></script>
+<script  src="/js/events.js" ></script>
+<script  src="/js/plugins.js" ></script>
+
+
+  <script  src="https://lib.baomitu.com/typed.js/2.0.12/typed.min.js" ></script>
+  <script>
+    (function (window, document) {
+      var typing = Fluid.plugins.typing;
+      var subtitle = document.getElementById('subtitle');
+      if (!subtitle || !typing) {
+        return;
+      }
+      var text = subtitle.getAttribute('data-typed-text');
+      
+        typing(text);
+      
+    })(window, document);
+  </script>
+
+
+
+
+  
+    <script  src="/js/img-lazyload.js" ></script>
+  
+
+
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/tocbot/4.20.1/tocbot.min.js', function() {
+    var toc = jQuery('#toc');
+    if (toc.length === 0 || !window.tocbot) { return; }
+    var boardCtn = jQuery('#board-ctn');
+    var boardTop = boardCtn.offset().top;
+
+    window.tocbot.init(Object.assign({
+      tocSelector     : '#toc-body',
+      contentSelector : '.markdown-body',
+      linkClass       : 'tocbot-link',
+      activeLinkClass : 'tocbot-active-link',
+      listClass       : 'tocbot-list',
+      isCollapsedClass: 'tocbot-is-collapsed',
+      collapsibleClass: 'tocbot-is-collapsible',
+      scrollSmooth    : true,
+      includeTitleTags: true,
+      headingsOffset  : -boardTop,
+    }, CONFIG.toc));
+    if (toc.find('.toc-list-item').length > 0) {
+      toc.css('visibility', 'visible');
+    }
+
+    Fluid.events.registerRefreshCallback(function() {
+      if ('tocbot' in window) {
+        tocbot.refresh();
+        var toc = jQuery('#toc');
+        if (toc.length === 0 || !tocbot) {
+          return;
+        }
+        if (toc.find('.toc-list-item').length > 0) {
+          toc.css('visibility', 'visible');
+        }
+      }
+    });
+  });
+</script>
+
+
+  <script src=https://lib.baomitu.com/clipboard.js/2.0.11/clipboard.min.js></script>
+
+  <script>Fluid.plugins.codeWidget();</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/anchor-js/4.3.1/anchor.min.js', function() {
+    window.anchors.options = {
+      placement: CONFIG.anchorjs.placement,
+      visible  : CONFIG.anchorjs.visible
+    };
+    if (CONFIG.anchorjs.icon) {
+      window.anchors.options.icon = CONFIG.anchorjs.icon;
+    }
+    var el = (CONFIG.anchorjs.element || 'h1,h2,h3,h4,h5,h6').split(',');
+    var res = [];
+    for (var item of el) {
+      res.push('.markdown-body > ' + item.trim());
+    }
+    if (CONFIG.anchorjs.placement === 'left') {
+      window.anchors.options.class = 'anchorjs-link-left';
+    }
+    window.anchors.add(res.join(', '));
+
+    Fluid.events.registerRefreshCallback(function() {
+      if ('anchors' in window) {
+        anchors.removeAll();
+        var el = (CONFIG.anchorjs.element || 'h1,h2,h3,h4,h5,h6').split(',');
+        var res = [];
+        for (var item of el) {
+          res.push('.markdown-body > ' + item.trim());
+        }
+        if (CONFIG.anchorjs.placement === 'left') {
+          anchors.options.class = 'anchorjs-link-left';
+        }
+        anchors.add(res.join(', '));
+      }
+    });
+  });
+</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.js', function() {
+    Fluid.plugins.fancyBox();
+  });
+</script>
+
+
+  <script>Fluid.plugins.imageCaption();</script>
+
+  <script defer src="/js/leancloud.js" ></script>
+
+  <script  src="/js/local-search.js" ></script>
+
+
+
+
+
+<!-- 主题的启动项，将它保持在最底部 -->
+<!-- the boot of the theme, keep it at the bottom -->
+<script  src="/js/boot.js" ></script>
+
+
+  
+
+  <noscript>
+    <div class="noscript-warning">博客在允许 JavaScript 运行的环境下浏览效果更佳</div>
+  </noscript>
+</body>
+</html>
