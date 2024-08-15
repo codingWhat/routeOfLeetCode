@@ -25,7 +25,7 @@
 <meta property="og:locale" content="zh_CN">
 <meta property="og:image" content="http://codingwhat.github.io/images/hash_func.png">
 <meta property="article:published_time" content="2024-08-05T14:40:01.000Z">
-<meta property="article:modified_time" content="2024-08-13T07:06:56.795Z">
+<meta property="article:modified_time" content="2024-08-15T02:55:49.157Z">
 <meta property="article:author" content="codingWhat">
 <meta property="article:tag" content="GO">
 <meta property="article:tag" content="本地缓存">
@@ -265,7 +265,7 @@
         
         
         
-          15 分钟
+          16 分钟
         
       </span>
     
@@ -391,8 +391,8 @@
 <td>支持</td>
 <td>GoGC</td>
 <td>-</td>
-<td>分片+读写锁</td>
-<td>TinyLFU&#x2F;SampledLFU，expireMap: map[timestamp]bucket, 一个周期对应一个bucket, 定期清理过期的bucket</td>
+<td>数据结构: 分片+读写锁, []map[int64]item; keyToHash(key string) hash1,hash2; hash1寻址，hash2冲突校验</td>
+<td>淘汰策略: TinyLFU&#x2F;SampledLFU; 数据结构: expireMap, map[timestamp]bucket, 一个周期对应一个bucket, 定期清理过期的bucket</td>
 <td>-</td>
 </tr>
 <tr>
