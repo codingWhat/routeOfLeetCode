@@ -264,7 +264,7 @@
       
       <a class="index-excerpt index-excerpt__noimg" href="/2024/08/09/gmp-understanding/" target="_self">
         <div>
-          Go启动流程初始化m0和g0，m0和主线程绑定，之后按core核数初始化所有P，将第一个P(即P0)和m0、g0绑定，剩余的P放入空闲队列中。之后会创建g1(runtime.main)，放入P0的本地队列中,之后m0的g0开始执行调度逻辑。 以Goroutine视角理解GMP以Goroutine生命周期来看，更像是生产&#x2F;消费模型，goroutine被创建之后，放到对应P的”队列”中, 之
+          调度器前世今生调度器核心职责就是通过复用线程来高效执行G, 目前GMP模型已经非常高效了，然而调度器也是经过一步一步演进来的，早期调度器只有G、M以及全局‘runq’，性能表现并不出色，尤其随着goroutine数增长，当m从全局队列消费G时会导致锁竞争非常严重，除此之外系统调用、阻塞等操作时M会休眠，此时M上的G得不到执行，严重影响性能。为了解决这些问题，Go开发者重新设计调度器，推出了当前“G
         </div>
       </a>
 
