@@ -82,6 +82,7 @@ keepalive_timeout  60s;
 
 问题解决:
 1. listen backlog用了默认长度511, listen backlog是长连接队列长度，如果长度过短，容易打满拒绝请求，将backlog长度调大，能进一步提升吞吐。
+2. 注意全局长连接队列限制 `/proc/sys/net/core/somaxconn` 也得调整，`nginx backlog` <= `somaxconn`
 
 ### 问题3: 暴力清理nginx日志
 通过keepalive配置，502问题确实明显改善了，但是突然过了几天，又偶现了502问题，在排查基础资源监控时发现502的时间点，恰好有磁盘和内存空间骤降；

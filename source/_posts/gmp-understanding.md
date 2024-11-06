@@ -6,14 +6,61 @@ tags:
 - GO-GMP
 - Go调度原理
 ---
-## Go启动流程
-初始化m0和g0，m0和主线程绑定，之后按core核数初始化所有P，将第一个P(即P0)和m0、g0绑定，剩余的P放入空闲队列中。之后会创建g1(runtime.main)，放入P0的本地队列中,之后m0的g0开始执行调度逻辑。
+## 调度器前世今生
+调度器核心职责就是通过复用线程来高效执行G, 目前GMP模型已经非常高效了，然而调度器也是经过一步一步演进来的，早期调度器只有G、M以及全局‘runq’，性能表现并不出色，尤其随着goroutine数增长，当m从全局队列消费G时会导致锁竞争非常严重，除此之外系统调用、阻塞等操作时M会休眠，此时M上的G得不到执行，严重影响性能。为了解决这些问题，Go开发者重新设计调度器，推出了当前“GMP”模型。
+
+## 调度器核心概念
+
+### Processor
+职责:
+1. 解决GM模型的全局锁问题
+2. `runq`和P绑定(GM模型中，M包含`runq`)，当M在执行阻塞调用休眠时，M和P解绑，P可以去找空闲M继续执行`runq`中的G
+
+P状态机:
+![gmp_p_status](/images/gmp_p_status.png)
+
+### Goroutine
+Goroutine简化版三种状态:
+- Waiting, 阻塞/系统调用中
+- Executing, 在M中正在执行
+- Runnable, 就绪状态，runq中
+
+G生命周期：
+- _GIdle(空闲链表中) -> _GDead(从链表中取出) -> _GRunnable(参数复制、入栈等) -> _GRunning
+- _GSyscall(系统调用) -> _GRunning
+- _GWaiting(阻塞) -> GRunnable
+
+![g_status](/images/g_status.png)
+
+G(用户)退出:
+runtime·goexit1(mcall) -> goexit0
+先切换到G0 -> 清空g的数据，解除和m的关系，g 的状态从 _Grunning 更新为 _Gdead，将g放入空闲队列
+
+### G0,M0,P0,allgs,allm,allp
+- M0:是启动程序后的编号为0的主线程，这个M对应的实例会在全局变量runtime.m0中，M0负责执⾏初始化操作和启动第⼀个G， 在之后M0就和其他的M⼀样了。
+- G0: 是每次启动⼀个M都会第⼀个创建的gourtine，G0仅⽤于负责调度的G，G0不指向任何可执⾏的函数,每个M都会有⼀个⾃⼰的G0。在调度或系统调⽤时会使⽤G0的栈空间, 全局变量的G0是M0的G0。
+- allgs: 记录所有的G
+- allm: 记录所有的M
+- allp: 记录所有的P
+- sched: sched是调度器，这里记录着所有空闲的m,空闲的p,全局队列runq等等
+
+![g0-p0-m0](/images/g0-p0-m0.png)
+
+
+### Sysmon线程:
+和P不需要的关联的m，循环执行，主要指责包含:
+- netpoll(fd事件)
+- retake (抢占)，抢占长时间运行的P
+- forcegc(定期执行gc)
+- scavenge heap (释放内存空间)
 
 
 ## 以Goroutine视角理解GMP
 以Goroutine生命周期来看，更像是生产/消费模型，goroutine被创建之后，放到对应P的"队列"中, 之后被调度器消费执行。
+### 启动流程
+初始化m0和g0，m0和主线程绑定，之后按core核数初始化所有P，将第一个P(即P0)和m0、g0绑定，剩余的P放入空闲队列中。之后会创建g1(runtime.main)，放入P0的本地队列中,之后m0的g0开始执行调度逻辑。
 
-### 生产G
+### 生产goroutine
 在生产阶段，底层对应`newproc`逻辑，通过`runqput`存储到P里。P有两个地方存储G, `runnenxt` 和 `runq`
 -  容量: `runnext`1个G，`runq`256个G，因此P总共可以存储257个G
 -  区别： `runnext`存储的是下一个要执行的G，`runq`是一个队列
@@ -24,8 +71,7 @@ tags:
 ![Goroutine和P交互细节](/images/g_to_p.png)
 
 
-
-### 消费G
+### 消费goroutine
 go1.20.11版本  
 调度逻辑: `runtime/proc.go`中的`schedule()`的`findRunnable()`方法
 1. 保证公平，防止全局`runq`中的goroutine饿死， 按概率(`runtime.SchedTick%61==0`)从全局runq中获取G
@@ -96,51 +142,4 @@ func runqgrab(pp *p // 受害者P, batch *[256]guintptr //施害者P的runq , ba
 - 信号机制，注册`runtime.sighandler`,接收到信号`SIGURG`时，由操作系统中断转入内核空间，而后将所中断线程的执行上下文参数(例如寄存器 rip、rep 等)传递给处理函数。如果在 runtime.sighandler 中修改了这个上下文参数，操作系统则会根据修 改后的上下文信息恢复执行
 
 
-## 调度器前世今生
-调度器核心职责就是通过复用线程来高效执行G, 目前GMP模型已经非常高效了，然而调度器也是经过一步一步演进来的，早期调度器只有G、M以及全局‘runq’，性能表现并不出色，尤其随着goroutine数增长，当m从全局队列消费G时会导致锁竞争非常严重，除此之外系统调用、阻塞等操作时M会休眠，此时M上的G得不到执行，严重影响性能。为了解决这些问题，Go开发者重新设计调度器，推出了当前“GMP”模型。
-
-## 调度器核心概念
-
-### Processor
-职责:
-1. 解决GM模型的全局锁问题
-2. `runq`和P绑定(GM模型中，M包含`runq`)，当M在执行阻塞调用休眠时，M和P解绑，P可以去找空闲M继续执行`runq`中的G
-
-P状态机:
-![gmp_p_status](/images/gmp_p_status.png)
-
-### Goroutine
-Goroutine简化版三种状态:
-- Waiting, 阻塞/系统调用中
-- Executing, 在M中正在执行
-- Runnable, 就绪状态，runq中
-
-G生命周期：
-- _GIdle(空闲链表中) -> _GDead(从链表中取出) -> _GRunnable(参数复制、入栈等) -> _GRunning
-- _GSyscall(系统调用) -> _GRunning
-- _GWaiting(阻塞) -> GRunnable
-
-![g_status](/images/g_status.png)
-
-G(用户)退出:
-runtime·goexit1(mcall) -> goexit0
-先切换到G0 -> 清空g的数据，解除和m的关系，g 的状态从 _Grunning 更新为 _Gdead，将g放入空闲队列
-
-### G0,M0,P0,allgs,allm,allp
-- M0:是启动程序后的编号为0的主线程，这个M对应的实例会在全局变量runtime.m0中，M0负责执⾏初始化操作和启动第⼀个G， 在之后M0就和其他的M⼀样了。
-- G0: 是每次启动⼀个M都会第⼀个创建的gourtine，G0仅⽤于负责调度的G，G0不指向任何可执⾏的函数,每个M都会有⼀个⾃⼰的G0。在调度或系统调⽤时会使⽤G0的栈空间, 全局变量的G0是M0的G0。
-- allgs: 记录所有的G
-- allm: 记录所有的M
-- allp: 记录所有的P
-- sched: sched是调度器，这里记录着所有空闲的m,空闲的p,全局队列runq等等
-
-![g0-p0-m0](/images/g0-p0-m0.png)
-
-
-### Sysmon线程:
-和P不需要的关联的m，循环执行，主要指责包含:
-- netpoll(fd事件)
-- retake (抢占)，抢占长时间运行的P
-- forcegc(定期执行gc)
-- scavenge heap (释放内存空间)
 
