@@ -176,6 +176,7 @@ fnv64 vs xxhash
 | BenchmarkBigCacheGetParallelForStruct-10       | 2769661  | 453.9           | 279             | 8                   |
 | **BenchmarkRistrettoGetParallelForStruct-10**  | 4853557  | 288.8           | 31              | 1                   |
 | **BenchmarkLCGetParallelForStruct-10**         | 3390566  | 416.5           | 29              | 2                   |
+
 总结:
 - 读取性能: Ristretto 和 SyncMap 在读取操作中表现最佳，具有较低的耗时和内存分配。
 - 写入性能: Ristretto 和 FreeCache 在写入操作中表现较好，尤其是 Ristretto，它在耗时表现出色但是可能存在失败的概率。
