@@ -23,16 +23,17 @@
 <meta property="og:site_name" content="codingWhat Blog">
 <meta property="og:description" content="在日常高流量场景中(读多写少场景)，经常会使用本地缓存来应对热点流量，保障系统的稳定。可是你有没有好奇过它底层是怎么实现的？数据是如何管理的？如果你来设计一个缓存库，你会如何设计?">
 <meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://codingwhat.github.io/images/go_localcaches_compare.png">
 <meta property="og:image" content="http://codingwhat.github.io/images/hash_func.png">
 <meta property="article:published_time" content="2024-08-05T14:40:01.000Z">
-<meta property="article:modified_time" content="2024-11-06T09:17:52.797Z">
+<meta property="article:modified_time" content="2024-11-06T09:20:42.315Z">
 <meta property="article:author" content="codingWhat">
 <meta property="article:tag" content="GO">
 <meta property="article:tag" content="本地缓存">
 <meta property="article:tag" content="LRU">
 <meta property="article:tag" content="高性能">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:image" content="http://codingwhat.github.io/images/hash_func.png">
+<meta name="twitter:image" content="http://codingwhat.github.io/images/go_localcaches_compare.png">
   
   
   
@@ -254,7 +255,7 @@
       <span class="post-meta mr-2">
         <i class="iconfont icon-chart"></i>
         
-          1.9k 字
+          1.6k 字
         
       </span>
     
@@ -265,7 +266,7 @@
         
         
         
-          17 分钟
+          14 分钟
         
       </span>
     
@@ -322,97 +323,13 @@
 
 
 <h1 id="他山之石，可以攻玉"><a href="#他山之石，可以攻玉" class="headerlink" title="他山之石，可以攻玉"></a>他山之石，可以攻玉</h1><p>在开始之前，借助开源社区了解主流缓存库的种类、设计思想以及适用场景是一个明智的做法。通过这样的调研，可以了解到不同缓存库的特点和优势，并从中汲取经验，以设计出符合自己需求的缓存库。 为了方便学习和理解，我对主流库做了详细调研并整理出以下多维度对比图，帮助你更清晰地了解不同缓存库之间的差异和优势。</p>
-<table>
-<thead>
-<tr>
-<th>缓存库</th>
-<th>社区活跃度</th>
-<th>过期时间</th>
-<th>GC</th>
-<th>无GC实现原理</th>
-<th>设计原理</th>
-<th>淘汰机制</th>
-<th>设计缺陷</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>freecache</td>
-<td>start:5k,fork:390</td>
-<td>支持</td>
-<td><font color="red"> Zero GC</font></td>
-<td>减少指针数，固定512个(256个segment，每个segment两个指针,RingBuf、[]entryPtr)</td>
-<td>(分片+互斥锁) + 内置map + slice + ringbuffer</td>
-<td>LRU</td>
-<td>不支持自动扩容</td>
-</tr>
-<tr>
-<td>bigcache</td>
-<td>start:7.4k,fork:591</td>
-<td>支持</td>
-<td><font color="red"> Zero GC</font></td>
-<td>无指针的map, map[uint64]uint32</td>
-<td>(分片+读写锁) + map[uint64]uint32 + fifo-buffer</td>
-<td>FIFO</td>
-<td>不支持对key设置过期时间</td>
-</tr>
-<tr>
-<td>fastcache</td>
-<td>start:2.1k,fork:175</td>
-<td>不支持</td>
-<td><font color="red"> Zero GC</font></td>
-<td>无指针的map, map[uint64]uint32</td>
-<td>(分片+读写锁) + map[uint64]uint64 + ringbuffer(chunks [][]byte)</td>
-<td>FIFO</td>
-<td>不支持过期时间</td>
-</tr>
-<tr>
-<td>groupcache</td>
-<td>start:12.9k,fork:1.4k</td>
-<td>不支持</td>
-<td>GoGC</td>
-<td>-</td>
-<td>全局读写锁+LRU链表</td>
-<td>LRU</td>
-<td>不支持过期时间</td>
-</tr>
-<tr>
-<td>go-cache</td>
-<td>start:8k,fork:865</td>
-<td>支持</td>
-<td>GoGC</td>
-<td>-</td>
-<td>全局读写锁 + map[string]item</td>
-<td>定期清理过期数据</td>
-<td>锁竞争严重</td>
-</tr>
-<tr>
-<td>ristretto</td>
-<td>start:5.5k,fork:365</td>
-<td>支持</td>
-<td>GoGC</td>
-<td>-</td>
-<td>数据结构: 分片+读写锁, []map[int64]item; keyToHash(key string) hash1,hash2; hash1寻址，hash2冲突校验</td>
-<td>淘汰策略: TinyLFU&#x2F;SampledLFU; 数据结构: expireMap, map[timestamp]bucket, 一个周期对应一个bucket, 定期清理过期的bucket</td>
-<td>-</td>
-</tr>
-<tr>
-<td>offheap</td>
-<td>start:363,fork:37</td>
-<td>不支持</td>
-<td><font color="red"> Zero GC</font></td>
-<td>堆外内存，syscall.Mmap</td>
-<td>内置HashTable  + syscall.Mmap</td>
-<td>-</td>
-<td>冲突时通过本地探测法，影响性能</td>
-</tr>
-</tbody></table>
-<p>上述中比较有意思的是Zero-Gc这个概念，我总结下关键信息:<br><strong>如何实现Zero-GC?</strong></p>
+<p><img src="/images/go_localcaches_compare.png" srcset="/img/loading.gif" lazyload alt="主流缓存库对比"><br>上述中比较有意思的是Zero-Gc这个概念，我总结下关键信息:<br><strong>如何实现Zero-GC?</strong></p>
 <ol>
 <li>完全避免GC: 采用syscall.MMap申请堆外内存，gc就不会扫描</li>
 <li>规避GC扫描策略: 数组(固定了指针数量) + 非指针map[uint64]uint32 + []byte(参考freecache) 或者 slice + 非指针的map + ringbuffer(参考bigcache)</li>
 </ol>
 <p><strong>如何选择？</strong><br>就笔者的经验来看，比如在http服务中，从缓存库读取[]byte内容，写入socket，这种场景Zero-GC库确实很高效比较适合(这也正是bigCache诞生的背景)。但是在业务逻辑中的海量操作都要经过序列化是不可接受的，会占用很多cpu资源，而非zero-gc就算gc会影响程序的性能，但是缓存项毕竟会淘汰不是无限的，再加上go现在的gc优化的也不错，所以权衡之下优先采用非Zero-GC库。</p>
-<p>综上，没有一个缓存库适用于所有场景和问题, 每个缓存库的诞生都是为了解决特定场景下的特定问题。 这些问题主要分为以下几类:</p>
+<p>综上，没有一个缓存库适用于所有场景和问题, 每个缓存库的诞生都是为了解决特定场景下的特定问题, 不过这些问题种类不多主要分为以下几类:</p>
 <ul>
 <li>锁竞争。全局锁导致大量请求都在抢锁、休眠，严重影响性能</li>
 <li>数据淘汰。内存资源有限，必须要按特定策略淘汰数据</li>
@@ -551,7 +468,6 @@
 <li>写入性能: Ristretto 和 BigCache 在写入操作中表现较好，尤其是 Ristretto，它在耗时和内存分配上都表现出色。</li>
 <li>内存效率: SyncMap 在Get操作中的内存分配最低，FreeCache在Set操作中内存分配最低, 整体上syncMap占用最低。</li>
 </ul>
-<p>syncMap: 5 * 78 + 25<br>ris: 144 * 4 + 32<br>free: 61 * 4 + 263 * 7<br>big: 203 * 4 + 279 * 8<br>lc : 698 * 15 + 31 * 2</p>
 <h2 id="未来展望"><a href="#未来展望" class="headerlink" title="未来展望"></a>未来展望</h2><p>从上述压测结果可以分析得出在高并发写场景下，跟其他主流库相比吞吐较低，主要原因是因为底层channel并发操作性能不佳，虽说本地缓存面向的是读多写少的场景，但如果有些场景对写的要求很高，可以用无锁队列替换。</p>
 
                 
