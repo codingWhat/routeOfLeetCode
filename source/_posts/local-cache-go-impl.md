@@ -15,16 +15,7 @@ tags:
 # 他山之石，可以攻玉
 在开始之前，借助开源社区了解主流缓存库的种类、设计思想以及适用场景是一个明智的做法。通过这样的调研，可以了解到不同缓存库的特点和优势，并从中汲取经验，以设计出符合自己需求的缓存库。 为了方便学习和理解，我对主流库做了详细调研并整理出以下多维度对比图，帮助你更清晰地了解不同缓存库之间的差异和优势。
 
-| 缓存库        | 社区活跃度                 | 过期时间 | GC                                | 无GC实现原理                                                   | 设计原理                                                                                 | 淘汰机制                                                                                           | 设计缺陷            | 
-|------------|-----------------------|------|-----------------------------------|-----------------------------------------------------------|--------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|-----------------|
-| freecache  | start:5k,fork:390     | 支持   | <font color="red"> Zero GC</font> | 减少指针数，固定512个(256个segment，每个segment两个指针,RingBuf、[]entryPtr) | (分片+互斥锁) + 内置map + slice + ringbuffer                                                | LRU                                                                                            | 不支持自动扩容         |
-| bigcache   | start:7.4k,fork:591   | 支持   | <font color="red"> Zero GC</font> | 无指针的map, map[uint64]uint32                                | (分片+读写锁) + map[uint64]uint32 + fifo-buffer                                           | FIFO                                                                                           | 不支持对key设置过期时间   |
-| fastcache  | start:2.1k,fork:175   | 不支持  | <font color="red"> Zero GC</font> | 无指针的map, map[uint64]uint32                                                     | (分片+读写锁) + map[uint64]uint64 + ringbuffer(chunks [][]byte)                           | FIFO                                                                                           | 不支持过期时间         |
-| groupcache | start:12.9k,fork:1.4k | 不支持 | GoGC                              | -                                                         | 全局读写锁+LRU链表                                                                          | LRU                                                                                            | 不支持过期时间         |
-| go-cache   | start:8k,fork:865     | 支持 | GoGC                                 | -                                                         | 全局读写锁 + map[string]item                                                              | 定期清理过期数据                                                                                       | 锁竞争严重           |
-| ristretto  | start:5.5k,fork:365   | 支持 | GoGC                                 | -                                                         | 数据结构: 分片+读写锁, []map[int64]item; keyToHash(key string) hash1,hash2; hash1寻址，hash2冲突校验 | 淘汰策略: TinyLFU/SampledLFU; 数据结构: expireMap, map[timestamp]bucket, 一个周期对应一个bucket, 定期清理过期的bucket | -               |
-| offheap    | start:363,fork:37     | 不支持 | <font color="red"> Zero GC</font> | 堆外内存，syscall.Mmap                                         | 内置HashTable  + syscall.Mmap                                                          | -                                                                                              | 冲突时通过本地探测法，影响性能 |
-
+![主流缓存库对比](/images/go_localcaches_compare.png)
 上述中比较有意思的是Zero-Gc这个概念，我总结下关键信息:  
 <strong>如何实现Zero-GC?</strong>
 1. 完全避免GC: 采用syscall.MMap申请堆外内存，gc就不会扫描
@@ -33,7 +24,7 @@ tags:
 <strong>如何选择？</strong>  
 就笔者的经验来看，比如在http服务中，从缓存库读取[]byte内容，写入socket，这种场景Zero-GC库确实很高效比较适合(这也正是bigCache诞生的背景)。但是在业务逻辑中的海量操作都要经过序列化是不可接受的，会占用很多cpu资源，而非zero-gc就算gc会影响程序的性能，但是缓存项毕竟会淘汰不是无限的，再加上go现在的gc优化的也不错，所以权衡之下优先采用非Zero-GC库。
 
-综上，没有一个缓存库适用于所有场景和问题, 每个缓存库的诞生都是为了解决特定场景下的特定问题。 这些问题主要分为以下几类:
+综上，没有一个缓存库适用于所有场景和问题, 每个缓存库的诞生都是为了解决特定场景下的特定问题, 不过这些问题种类不多主要分为以下几类:
 - 锁竞争。全局锁导致大量请求都在抢锁、休眠，严重影响性能
 - 数据淘汰。内存资源有限，必须要按特定策略淘汰数据
 - GC问题。存储海量对象时，GC扫描的影响不容小觑
