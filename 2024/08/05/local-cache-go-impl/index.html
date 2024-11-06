@@ -25,7 +25,7 @@
 <meta property="og:locale" content="zh_CN">
 <meta property="og:image" content="http://codingwhat.github.io/images/hash_func.png">
 <meta property="article:published_time" content="2024-08-05T14:40:01.000Z">
-<meta property="article:modified_time" content="2024-08-15T02:55:49.157Z">
+<meta property="article:modified_time" content="2024-11-06T09:17:52.797Z">
 <meta property="article:author" content="codingWhat">
 <meta property="article:tag" content="GO">
 <meta property="article:tag" content="本地缓存">
@@ -254,7 +254,7 @@
       <span class="post-meta mr-2">
         <i class="iconfont icon-chart"></i>
         
-          1.8k 字
+          1.9k 字
         
       </span>
     
@@ -265,7 +265,7 @@
         
         
         
-          16 分钟
+          17 分钟
         
       </span>
     
@@ -481,50 +481,77 @@
 <th>压测case</th>
 <th>操作次数</th>
 <th>单次耗时</th>
+<th>内存分配</th>
 </tr>
 </thead>
 <tbody><tr>
 <td>BenchmarkSyncMapSetParallelForStruct-10</td>
-<td>1330215</td>
-<td>907.6 ns&#x2F;op</td>
+<td>1000000</td>
+<td>1023 ns&#x2F;op</td>
+<td>78 B&#x2F;op 5 allocs&#x2F;op</td>
+</tr>
+<tr>
+<td><strong>BenchmarkRistrettoSetParallelForStruct-10</strong></td>
+<td>2261913</td>
+<td>517.2 ns&#x2F;op</td>
+<td>144 B&#x2F;op 4 allocs&#x2F;op</td>
 </tr>
 <tr>
 <td>BenchmarkFreeCacheSetParallelForStruct-10</td>
-<td>2191702</td>
-<td>549.8 ns&#x2F;op</td>
+<td>2182159</td>
+<td>550.0 ns&#x2F;op</td>
+<td>61 B&#x2F;op 4 allocs&#x2F;op</td>
 </tr>
 <tr>
 <td>BenchmarkBigCacheSetParallelForStruct-10</td>
-<td>2250765</td>
-<td>528.6 ns&#x2F;op</td>
+<td>2208849</td>
+<td>546.1 ns&#x2F;op</td>
+<td>203 B&#x2F;op 4 allocs&#x2F;op</td>
 </tr>
 <tr>
 <td><strong>BenchmarkLCSetParallelForStruct-10</strong></td>
-<td>590721</td>
-<td>2114 ns&#x2F;op</td>
+<td>545134</td>
+<td>2734 ns&#x2F;op</td>
+<td>698 B&#x2F;op 15 allocs&#x2F;op</td>
 </tr>
 <tr>
 <td>BenchmarkSyncMapGetParallelForStruct-10</td>
-<td>3960368</td>
-<td>313.6 ns&#x2F;op</td>
+<td>3784549</td>
+<td>322.1 ns&#x2F;op</td>
+<td>25 B&#x2F;op 1 allocs&#x2F;op</td>
 </tr>
 <tr>
 <td>BenchmarkFreeCacheGetParallelForStruct-10</td>
-<td>2146406</td>
-<td>545.5 ns&#x2F;op</td>
+<td>2151574</td>
+<td>559.0 ns&#x2F;op</td>
+<td>263 B&#x2F;op 7 allocs&#x2F;op</td>
 </tr>
 <tr>
 <td>BenchmarkBigCacheGetParallelForStruct-10</td>
-<td>2329698</td>
-<td>516.4 ns&#x2F;op</td>
+<td>2285148</td>
+<td>532.3 ns&#x2F;op</td>
+<td>279 B&#x2F;op 8 allocs&#x2F;op</td>
+</tr>
+<tr>
+<td><strong>BenchmarkRistrettoGetParallelForStruct-10</strong></td>
+<td>3225963</td>
+<td>377.4 ns&#x2F;op</td>
+<td>32 B&#x2F;op 1 allocs&#x2F;op</td>
 </tr>
 <tr>
 <td><strong>BenchmarkLCGetParallelForStruct-10</strong></td>
-<td>2386426</td>
-<td>475.1 ns&#x2F;op</td>
+<td>2287580</td>
+<td>486.8 ns&#x2F;op</td>
+<td>31 B&#x2F;op 2 allocs&#x2F;op</td>
 </tr>
 </tbody></table>
-<p>经过压测分析，在写入数据由于我们采用的是同步模式，对比其他库有一些弱势，但是在读取时由于不需要序列化操作，相比Zero-Gc要快些。</p>
+<p>总结:</p>
+<ul>
+<li>读取性能: Ristretto 和 SyncMap 在读取操作中表现最佳，具有较低的耗时和内存分配。</li>
+<li>写入性能: Ristretto 和 BigCache 在写入操作中表现较好，尤其是 Ristretto，它在耗时和内存分配上都表现出色。</li>
+<li>内存效率: SyncMap 在Get操作中的内存分配最低，FreeCache在Set操作中内存分配最低, 整体上syncMap占用最低。</li>
+</ul>
+<p>syncMap: 5 * 78 + 25<br>ris: 144 * 4 + 32<br>free: 61 * 4 + 263 * 7<br>big: 203 * 4 + 279 * 8<br>lc : 698 * 15 + 31 * 2</p>
 <h2 id="未来展望"><a href="#未来展望" class="headerlink" title="未来展望"></a>未来展望</h2><p>从上述压测结果可以分析得出在高并发写场景下，跟其他主流库相比吞吐较低，主要原因是因为底层channel并发操作性能不佳，虽说本地缓存面向的是读多写少的场景，但如果有些场景对写的要求很高，可以用无锁队列替换。</p>
 
                 
