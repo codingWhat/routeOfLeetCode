@@ -163,6 +163,8 @@ fnv64 vs xxhash
 ## 压测对比
 [代码地址](https://github.com/codingWhat/armory/tree/main/cache/localcache)
 
+同步模式:
+
 | 压测case                                   | 操作次数  | 单次耗时   | 内存分配      |
 |-------------------------------------------|----------|-----------|--------------|
 | BenchmarkSyncMapSetParallelForStruct-10   | 1000000  | 1023 ns/op| 78 B/op 5 allocs/op |
@@ -181,7 +183,22 @@ fnv64 vs xxhash
 - 写入性能: Ristretto 和 BigCache 在写入操作中表现较好，尤其是 Ristretto，它在耗时和内存分配上都表现出色。
 - 内存效率: SyncMap 在Get操作中的内存分配最低，FreeCache在Set操作中内存分配最低, 整体上syncMap占用最低。
 
+非同步模式:
+读、写、耗时、内存分配逐渐接近主流库的, 但是写存在失败的概率，需要按场景权衡。
+
+| 压测case                                   | 操作次数  | 单次耗时 (ns/op) | 内存分配 (B/op) | 分配次数 (allocs/op) |
+|-------------------------------------------|----------|-----------------|-----------------|---------------------|
+| BenchmarkSyncMapSetParallelForStruct-10   | 1256974  | 958.8           | 78              | 5                   |
+| **BenchmarkRistrettoSetParallelForStruct-10** | 2372764  | 505.6           | 143             | 4                   |
+| BenchmarkFreeCacheSetParallelForStruct-10 | 2117694  | 554.2           | 61              | 4                   |
+| BenchmarkBigCacheSetParallelForStruct-10  | 2130927  | 547.5           | 206             | 4                   |
+| **BenchmarkLCSetParallelForStruct-10**         | 2115037  | 567.1           | 158             | 6                   |
+| BenchmarkSyncMapGetParallelForStruct-10   | 3854450  | 305.2           | 23              | 1                   |
+| BenchmarkFreeCacheGetParallelForStruct-10 | 2152428  | 560.6           | 263             | 7                   |
+| BenchmarkBigCacheGetParallelForStruct-10  | 2202607  | 539.5           | 279             | 8                   |
+| **BenchmarkRistrettoGetParallelForStruct-10**  | 3445798  | 349.7           | 31              | 1                   |
+| **BenchmarkLCGetParallelForStruct-10**         | 2453848  | 505.4           | 30              | 2                   |
 
 
 ## 未来展望
-从上述压测结果可以分析得出在高并发写场景下，跟其他主流库相比吞吐较低，主要原因是因为底层channel并发操作性能不佳，虽说本地缓存面向的是读多写少的场景，但如果有些场景对写的要求很高，可以用无锁队列替换。
+继续优化写场景下，临时对象的管理，减少耗时操作和频繁的内存申请。
