@@ -26,7 +26,7 @@
 <meta property="og:image" content="http://codingwhat.github.io/images/go_localcaches_compare.png">
 <meta property="og:image" content="http://codingwhat.github.io/images/hash_func.png">
 <meta property="article:published_time" content="2024-08-05T14:40:01.000Z">
-<meta property="article:modified_time" content="2024-11-06T09:20:42.315Z">
+<meta property="article:modified_time" content="2024-11-06T11:02:30.358Z">
 <meta property="article:author" content="codingWhat">
 <meta property="article:tag" content="GO">
 <meta property="article:tag" content="本地缓存">
@@ -255,7 +255,7 @@
       <span class="post-meta mr-2">
         <i class="iconfont icon-chart"></i>
         
-          1.6k 字
+          1.7k 字
         
       </span>
     
@@ -392,6 +392,7 @@
 <h4 id="读操作"><a href="#读操作" class="headerlink" title="读操作"></a>读操作</h4><p><strong>批量操作:</strong> 采用ringbuffer，批量更新链表</p>
 <h4 id="内存优化"><a href="#内存优化" class="headerlink" title="内存优化"></a>内存优化</h4><p>采用sync.Pool池化ringbuffer对象，避免频繁创建对象</p>
 <h2 id="压测对比"><a href="#压测对比" class="headerlink" title="压测对比"></a>压测对比</h2><p><a target="_blank" rel="noopener" href="https://github.com/codingWhat/armory/tree/main/cache/localcache">代码地址</a></p>
+<p>同步模式:</p>
 <table>
 <thead>
 <tr>
@@ -468,7 +469,89 @@
 <li>写入性能: Ristretto 和 BigCache 在写入操作中表现较好，尤其是 Ristretto，它在耗时和内存分配上都表现出色。</li>
 <li>内存效率: SyncMap 在Get操作中的内存分配最低，FreeCache在Set操作中内存分配最低, 整体上syncMap占用最低。</li>
 </ul>
-<h2 id="未来展望"><a href="#未来展望" class="headerlink" title="未来展望"></a>未来展望</h2><p>从上述压测结果可以分析得出在高并发写场景下，跟其他主流库相比吞吐较低，主要原因是因为底层channel并发操作性能不佳，虽说本地缓存面向的是读多写少的场景，但如果有些场景对写的要求很高，可以用无锁队列替换。</p>
+<p>非同步模式:<br>读、写、耗时、内存分配逐渐接近主流库的, 但是写存在失败的概率，需要按场景权衡。</p>
+<table>
+<thead>
+<tr>
+<th>压测case</th>
+<th>操作次数</th>
+<th>单次耗时 (ns&#x2F;op)</th>
+<th>内存分配 (B&#x2F;op)</th>
+<th>分配次数 (allocs&#x2F;op)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>BenchmarkSyncMapSetParallelForStruct-10</td>
+<td>1256974</td>
+<td>958.8</td>
+<td>78</td>
+<td>5</td>
+</tr>
+<tr>
+<td><strong>BenchmarkRistrettoSetParallelForStruct-10</strong></td>
+<td>2372764</td>
+<td>505.6</td>
+<td>143</td>
+<td>4</td>
+</tr>
+<tr>
+<td>BenchmarkFreeCacheSetParallelForStruct-10</td>
+<td>2117694</td>
+<td>554.2</td>
+<td>61</td>
+<td>4</td>
+</tr>
+<tr>
+<td>BenchmarkBigCacheSetParallelForStruct-10</td>
+<td>2130927</td>
+<td>547.5</td>
+<td>206</td>
+<td>4</td>
+</tr>
+<tr>
+<td><strong>BenchmarkLCSetParallelForStruct-10</strong></td>
+<td>2115037</td>
+<td>567.1</td>
+<td>158</td>
+<td>6</td>
+</tr>
+<tr>
+<td>BenchmarkSyncMapGetParallelForStruct-10</td>
+<td>3854450</td>
+<td>305.2</td>
+<td>23</td>
+<td>1</td>
+</tr>
+<tr>
+<td>BenchmarkFreeCacheGetParallelForStruct-10</td>
+<td>2152428</td>
+<td>560.6</td>
+<td>263</td>
+<td>7</td>
+</tr>
+<tr>
+<td>BenchmarkBigCacheGetParallelForStruct-10</td>
+<td>2202607</td>
+<td>539.5</td>
+<td>279</td>
+<td>8</td>
+</tr>
+<tr>
+<td><strong>BenchmarkRistrettoGetParallelForStruct-10</strong></td>
+<td>3445798</td>
+<td>349.7</td>
+<td>31</td>
+<td>1</td>
+</tr>
+<tr>
+<td><strong>BenchmarkLCGetParallelForStruct-10</strong></td>
+<td>2453848</td>
+<td>505.4</td>
+<td>30</td>
+<td>2</td>
+</tr>
+</tbody></table>
+<h2 id="未来展望"><a href="#未来展望" class="headerlink" title="未来展望"></a>未来展望</h2><p>继续优化写场景下，临时对象的管理，减少耗时操作和频繁的内存申请。</p>
 
                 
               </div>
