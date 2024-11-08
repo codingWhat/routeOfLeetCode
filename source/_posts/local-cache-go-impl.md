@@ -164,23 +164,24 @@ fnv64 vs xxhash
 [代码地址](https://github.com/codingWhat/armory/tree/main/cache/localcache)
 同步模式:
 
-| 压测case                                       | 操作次数  | 单次耗时 (ns/op) | 内存分配 (B/op) | 分配次数 (allocs/op) |
-|------------------------------------------------|----------|-----------------|-----------------|---------------------|
-| BenchmarkSyncMapSetParallelForStruct-10        | 1408602  | 954.9           | 77              | 5                   |
-| **BenchmarkRistrettoSetParallelForStruct-10**  | 3034279  | 381.5           | 138             | 4                   |
-| BenchmarkFreeCacheSetParallelForStruct-10      | 2509905  | 470.7           | 62              | 4                   |
-| BenchmarkBigCacheSetParallelForStruct-10       | 2489360  | 475.1           | 186             | 4                   |
-| **BenchmarkLCSetParallelForStruct-10**         | 790218   | 1410            | 294             | 8                   |
-| BenchmarkSyncMapGetParallelForStruct-10        | 4995093  | 270.4           | 23              | 1                   |
-| BenchmarkFreeCacheGetParallelForStruct-10      | 2393904  | 480.6           | 263             | 7                   |
-| BenchmarkBigCacheGetParallelForStruct-10       | 2769661  | 453.9           | 279             | 8                   |
-| **BenchmarkRistrettoGetParallelForStruct-10**  | 4853557  | 288.8           | 31              | 1                   |
-| **BenchmarkLCGetParallelForStruct-10**         | 3390566  | 416.5           | 29              | 2                   |
+
+| 压测case                                 | 操作次数   | 单次耗时 (ns/op) | 内存分配 (B/op) | 分配次数 |
+|------------------------------------------|------------|------------------|-----------------|----------|
+| BenchmarkSyncMapSetParallelForStruct-10  | 1,576,032  | 719.3            | 76              | 5        |
+| **BenchmarkRistrettoSetParallelForStruct-10** | 716,690    | 1,642            | 369             | 11       |
+| BenchmarkFreeCacheSetParallelForStruct-10| 2,122,884  | 562.7            | 61              | 4        |
+| BenchmarkBigCacheSetParallelForStruct-10 | 2,206,600  | 546.9            | 200             | 4        |
+| **BenchmarkLCSetParallelForStruct-10**   | 914,626    | 1,279            | 282             | 9        |
+| BenchmarkSyncMapGetParallelForStruct-10  | 3,933,157  | 305.5            | 24              | 1        |
+| BenchmarkFreeCacheGetParallelForStruct-10| 2,159,518  | 577.2            | 263             | 7        |
+| BenchmarkBigCacheGetParallelForStruct-10 | 2,218,573  | 539.1            | 279             | 8        |
+| **BenchmarkRistrettoGetParallelForStruct-10** | 3,195,711  | 379.0            | 31              | 1        |
+| **BenchmarkLCGetParallelForStruct-10**   | 2,233,429  | 530.5            | 31              | 2        |
 
 总结:
-- 读取性能: Ristretto 和 SyncMap 在读取操作中表现最佳，具有较低的耗时和内存分配。
-- 写入性能: Ristretto 和 FreeCache 在写入操作中表现较好，尤其是 Ristretto，它在耗时表现出色但是可能存在失败的概率。
-- 内存效率: SyncMap 在Get操作中的内存分配最低，FreeCache在Set操作中内存分配最低, 整体上syncMap占用最低。
+- 读取性能: LC 和 SyncMap 在读取操作中表现最佳，具有较低的耗时和内存分配。
+- 写入性能: BigCache 和 FreeCache 在写入操作中表现较好，LC、Ristretto因为channel缘故，写入性能较差。
+- 内存效率: SyncMap/Ristretto 在Get操作中的内存分配最低，FreeCache在Set操作中内存分配最低, 整体上syncMap占用最低。
 
 非同步模式:
 读、写、耗时、内存分配逐渐接近主流库的, 但是写存在失败的概率，需要按场景权衡。
