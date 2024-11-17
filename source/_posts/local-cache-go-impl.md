@@ -19,10 +19,17 @@ tags:
 上述中比较有意思的是Zero-Gc这个概念，我总结下关键信息:  
 <strong>如何实现Zero-GC?</strong>
 1. 完全避免GC: 采用syscall.MMap申请堆外内存，gc就不会扫描
-2. 规避GC扫描策略: 数组(固定了指针数量) + 非指针map[uint64]uint32 + []byte(参考freecache) 或者 slice + 非指针的map + ringbuffer(参考bigcache)
+2. 规避GC扫描策略:
+- 数组(固定了指针数量) + map[uint64]uint32(非指针) + []byte(参考freecache) 
+- slice + 非指针的map + ringbuffer(参考bigcache)
 
-<strong>如何选择？</strong>  
-就笔者的经验来看，比如在http服务中，从缓存库读取[]byte内容，写入socket，这种场景Zero-GC库确实很高效比较适合(这也正是bigCache诞生的背景)。但是在业务逻辑中的海量操作都要经过序列化是不可接受的，会占用很多cpu资源，而非zero-gc就算gc会影响程序的性能，但是缓存项毕竟会淘汰不是无限的，再加上go现在的gc优化的也不错，所以权衡之下优先采用非Zero-GC库。
+
+<strong>如何选择？</strong>
+- 读写性能要求? 比如ristretto底层依赖channel,Get很快，但是Set如果是同步模式，会较慢需要评估。
+- gc敏感度, 需要压测看业务是否能接受。
+- 过期时间配置是否灵活，有些库甚至都不支持过期时间，不过这还得取决于使用场景需要自行评估。
+- 业务匹配度，比如大部分业务ristretto更适合，支持泛型、使用门槛低，不过有一定的gc压力；再比如apiCache场景，只是简单的取出缓存写socket，无序序列化，那更适合bigCache，不过bigCache读的时候存在内存拷贝，需要留意;
+
 
 综上，没有一个缓存库适用于所有场景和问题, 每个缓存库的诞生都是为了解决特定场景下的特定问题, 不过这些问题种类不多主要分为以下几类:
 - 锁竞争。全局锁导致大量请求都在抢锁、休眠，严重影响性能
