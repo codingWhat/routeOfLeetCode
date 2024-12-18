@@ -256,6 +256,39 @@
     <article class="col-12 col-md-12 mx-auto index-info">
       <h2 class="index-header">
         
+        <a href="/2024/12/18/go-mem-optimize-thought/" target="_self">
+          go内存优化分析思路
+        </a>
+      </h2>
+
+      
+      <a class="index-excerpt index-excerpt__noimg" href="/2024/12/18/go-mem-optimize-thought/" target="_self">
+        <div>
+          优化原则 切勿过早优化 善用语言分析工具  优化思路 优先分配到栈空间 一次性申请空间 复用空间 减少指针。指针会被编译器加入(&#x3D; nil panic逻辑， 较值类型多判断逻辑)  内存优化本质就是对栈空间和堆空间的优化 编码阶段-栈空间尽可能控制局部变量被分配到栈空间，减轻GC的扫描压力  逃逸分析  1go build -gcflags=&quot;-m&quot;  package
+        </div>
+      </a>
+
+      <div class="index-btm post-metas">
+        
+          <div class="post-meta mr-3">
+            <i class="iconfont icon-date"></i>
+            <time datetime="2024-12-18 16:01" pubdate>
+              2024-12-18
+            </time>
+          </div>
+        
+        
+        
+      </div>
+    </article>
+  </div>
+
+  <div class="row mx-auto index-card">
+    
+    
+    <article class="col-12 col-md-12 mx-auto index-info">
+      <h2 class="index-header">
+        
         <a href="/2024/10/23/how-to-migrate-data/" target="_self">
           如何优雅迁移数据
         </a>
