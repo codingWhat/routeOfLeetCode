@@ -26,7 +26,7 @@
 <meta property="og:image" content="http://codingwhat.github.io/images/go_mem_escape.png">
 <meta property="og:image" content="http://codingwhat.github.io/images/gc_mutator.png">
 <meta property="article:published_time" content="2024-12-18T08:01:01.000Z">
-<meta property="article:modified_time" content="2024-12-18T09:48:53.583Z">
+<meta property="article:modified_time" content="2024-12-18T09:54:16.116Z">
 <meta property="article:author" content="codingWhat">
 <meta property="article:tag" content="evanhan codingWhat 博客 韩伟的博客 系统设计 后端开发">
 <meta name="twitter:card" content="summary_large_image">
@@ -263,7 +263,7 @@
         
         
         
-          9 分钟
+          10 分钟
         
       </span>
     
@@ -379,7 +379,7 @@
 <ol>
 <li>一次性申请空间, 比如slice&#x2F;map, 初始化时传具体大小参数，规避扩容(rehash&#x2F;growslice)逻辑。</li>
 <li>使用单例模式。一般服务都是分层的，如service&#x2F;dao等，链路中会NewXXXService, 使用sync.Once避免创建大量临时对象。</li>
-<li>去除不必要的数据结构。一般读接口会涉及到组装接口，都会用map存储映射数据，可以去除这个map，直接用slice 索引定位数据，能省下大量的map临时对象。</li>
+<li>去除不必要的数据结构。一般读接口会涉及到组装数据，通常会用map存储映射数据方便定位，不过可以去除这个map，直接用slice索引定位数据，能省下大量的map临时对象。<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><code class="hljs sql">伪代码<br>func getComments(commentIds []<span class="hljs-type">int</span>) map[<span class="hljs-type">int</span>]commentInfo &#123;<br>     <br>     []commentsInfo  <span class="hljs-operator">&lt;=</span> comments:<span class="hljs-operator">=</span>  loadDataFromDB(commentIds)<br>    <br>     var map[<span class="hljs-type">int</span>]commentInfo <span class="hljs-operator">/</span><span class="hljs-operator">/</span>可以移除， 直接返回[]commentsInfo。外部组装时，直接用索引定位数据<br>     <span class="hljs-keyword">for</span> _, comm :<span class="hljs-operator">=</span><span class="hljs-keyword">range</span> comments &#123;<br>        ret map[comm.ID] <span class="hljs-operator">=</span> comm<br>     &#125;<br>    <span class="hljs-keyword">return</span> <br> &#125;<br></code></pre></td></tr></table></figure></li>
 <li>复用资源。常见的比如从连接中读取数据, 通常会创建 bytes.Buffer，可使用sync.Pool复用</li>
 </ol>
 <figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-keyword">var</span> buffPool10K = sync.Pool&#123;<br>	New: <span class="hljs-function"><span class="hljs-keyword">func</span><span class="hljs-params">()</span></span> <span class="hljs-keyword">interface</span>&#123;&#125; &#123; <span class="hljs-keyword">return</span> <span class="hljs-built_in">make</span>([]<span class="hljs-type">byte</span>, <span class="hljs-number">10240</span>) &#125;,<br>&#125;<br><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">GetBuffer</span><span class="hljs-params">()</span></span> *bytes.Buffer &#123;<br>	 <span class="hljs-keyword">return</span> buffPool10K.Get().(*bytes.Buffer)<br>&#125;<br><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">PutBuffer</span><span class="hljs-params">(buff *bytes.Buffer)</span></span> &#123;<br>	buff.Reset()<br>	buffPool10K.Put(buff)<br>&#125;<br></code></pre></td></tr></table></figure>
