@@ -182,11 +182,10 @@ go tool trace -http=127.0.0.1:8129 trace.out
 - GC频率，看是否太过频繁
 - **Minimum mutator utilization**，
 
-仅勾选”STW” ，mutator=0时，即为GC耗时
 mutator使用率越接近100%，GC影响越少，
 
 ![image.png](/images/gc_mutator.png)
 
 tips:
-
-trace view中可以看到服务是不是并发的，具体来说看看服务协程是不是在同一时间端内跑
+1. 仅勾选”STW” ，mutator=0时，即为GC耗时
+2. trace view中可以看到服务是不是并发的，具体来说看看服务协程是不是在同一时间端内跑
