@@ -26,7 +26,7 @@
 <meta property="og:image" content="http://codingwhat.github.io/images/go_mem_escape.png">
 <meta property="og:image" content="http://codingwhat.github.io/images/gc_mutator.png">
 <meta property="article:published_time" content="2024-12-18T08:01:01.000Z">
-<meta property="article:modified_time" content="2024-12-18T09:39:29.709Z">
+<meta property="article:modified_time" content="2024-12-18T09:41:19.598Z">
 <meta property="article:author" content="codingWhat">
 <meta property="article:tag" content="evanhan codingWhat 博客 韩伟的博客 系统设计 后端开发">
 <meta name="twitter:card" content="summary_large_image">
@@ -416,10 +416,8 @@
 <p>通过trace可以得知以下信息:</p>
 <ul>
 <li>GC频率，看是否太过频繁</li>
-<li><strong>Minimum mutator utilization</strong>，</li>
+<li><strong>Minimum mutator utilization</strong>， mutator使用率越接近100%，GC影响越少，<br><img src="/images/gc_mutator.png" srcset="/img/loading.gif" lazyload alt="mutator使用率"></li>
 </ul>
-<p>mutator使用率越接近100%，GC影响越少，</p>
-<p><img src="/images/gc_mutator.png" srcset="/img/loading.gif" lazyload alt="image.png"></p>
 <p>tips:</p>
 <ol>
 <li>仅勾选”STW” ，mutator&#x3D;0时，即为GC耗时</li>
