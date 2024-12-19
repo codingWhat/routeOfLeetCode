@@ -53,8 +53,8 @@ func (c *Fake) Run() {
 此处go1.18
 
 获取写锁
-1. 第一步每个写操作会先抢占互斥锁，
-2. 接着通过加一个负的超大整形数，将readerCount变为负数，记住这里设计比较巧妙！！<font color="red">只要readerCount为负数，说明上了写锁或者写锁在等待。</font>
+1. 写锁会先抢占互斥锁，
+2. 接着readCount加rwmutexMaxReaders(超大负数)变为负数，记住这里设计比较巧妙！！<font color="red">只要readerCount为负数，说明上了写锁或者写锁在等待。</font>
 3. 之后又加rwmutexMaxReaders，又可以复原读锁的协程数。
 4. 尝试将当前读锁协程数赋值给readerWait
 5. 查看是否没有释放读锁的协程，如果有，则直接进入等待休眠队列，等待被唤醒。
