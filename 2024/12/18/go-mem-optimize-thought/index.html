@@ -26,7 +26,7 @@
 <meta property="og:image" content="http://codingwhat.github.io/images/go_mem_escape.png">
 <meta property="og:image" content="http://codingwhat.github.io/images/gc_mutator.png">
 <meta property="article:published_time" content="2024-12-18T08:01:01.000Z">
-<meta property="article:modified_time" content="2024-12-19T03:49:03.214Z">
+<meta property="article:modified_time" content="2024-12-19T03:59:32.346Z">
 <meta property="article:author" content="codingWhat">
 <meta property="article:tag" content="evanhan codingWhat 博客 韩伟的博客 系统设计 后端开发">
 <meta name="twitter:card" content="summary_large_image">
@@ -252,7 +252,7 @@
       <span class="post-meta mr-2">
         <i class="iconfont icon-chart"></i>
         
-          1.4k 字
+          1.5k 字
         
       </span>
     
@@ -263,7 +263,7 @@
         
         
         
-          12 分钟
+          13 分钟
         
       </span>
     
@@ -335,13 +335,11 @@
 </li>
 </ol>
 <p><strong>内存优化本质就是对栈空间和堆空间的优化</strong></p>
-<h1 id="编码阶段-栈空间"><a href="#编码阶段-栈空间" class="headerlink" title="编码阶段-栈空间"></a>编码阶段-栈空间</h1><p>尽可能将局部变量被分配到栈空间，减轻GC的扫描压力</p>
-<ul>
-<li>逃逸分析</li>
-</ul>
+<h1 id="编码阶段-栈空间"><a href="#编码阶段-栈空间" class="headerlink" title="编码阶段-栈空间"></a>编码阶段-栈空间</h1><p>尽可能将局部变量被分配到栈空间，减轻GC的扫描压力，可以关注变量是否逃逸。</p>
+<h2 id="逃逸分析工具"><a href="#逃逸分析工具" class="headerlink" title="逃逸分析工具"></a>逃逸分析工具</h2><p>go在编译时通过<code>gcflags</code>分析特定包下所有函数变量的逃逸情况。</p>
 <figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><code class="hljs go"># -l 禁止编译器内联优化<br><span class="hljs-keyword">go</span> build -gcflags=<span class="hljs-string">&quot;-m -l&quot;</span>  <span class="hljs-keyword">package</span><br></code></pre></td></tr></table></figure>
 
-<p>常见逃逸场景:</p>
+<h2 id="逃逸case"><a href="#逃逸case" class="headerlink" title="逃逸case"></a>逃逸case</h2><p>常见逃逸场景:</p>
 <ul>
 <li>函数外引用</li>
 <li>局部变量太大</li>
@@ -364,27 +362,17 @@
 
 <p>上述两者也可以合并:</p>
 <figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-keyword">go</span> tool pprof -http=:<span class="hljs-number">8884</span>  http:<span class="hljs-comment">//目标机器:端口/debug/pprof/heap?seconds=采集周期</span><br></code></pre></td></tr></table></figure>
-<h2 id="常见问题"><a href="#常见问题" class="headerlink" title="常见问题"></a>常见问题</h2><h3 id="内存泄漏"><a href="#内存泄漏" class="headerlink" title="内存泄漏"></a>内存泄漏</h3><p>分类</p>
+<h2 id="常见问题以及其解决方案"><a href="#常见问题以及其解决方案" class="headerlink" title="常见问题以及其解决方案"></a>常见问题以及其解决方案</h2><p>分类:</p>
+<ol>
+<li>内存泄漏</li>
+<li>GC-STW耗时</li>
+</ol>
+<h3 id="内存泄漏"><a href="#内存泄漏" class="headerlink" title="内存泄漏"></a>内存泄漏</h3><p>分类</p>
 <ol>
 <li>临时性内存泄漏 (大量临时对象，gc还没来的即清理，影响新对象的申请)</li>
 <li>永久性内存泄漏 (资源未关闭&#x2F;释放, 文件&#x2F;连接未关闭, 协程未释放)</li>
 </ol>
-<p>排查思路:</p>
-<ol>
-<li><p>协程泄漏</p>
-<ol>
-<li><p>排查渠道: </p>
-<ol>
-<li>一般可以通过监控看到协程数暴涨 </li>
-<li>pprof heap的时候会看到 <code>runtime.malg</code> 调用量很多，这说明go创建了很多</li>
-</ol>
-</li>
-<li><p>查看goroutine堆栈信息</p>
- <figure class="highlight apache"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><code class="hljs apache"><span class="hljs-comment"># debug=0:可以看到goroutine总数; 1: 可以看到goroutine堆栈信息(死锁问题也可以用)</span><br><span class="hljs-attribute">go</span> tool pprof -http=:<span class="hljs-number">8088</span> http://目标机器:端口/debug/pprof/groutine?debug=<span class="hljs-number">1</span><br></code></pre></td></tr></table></figure></li>
-</ol>
-</li>
-</ol>
-<h3 id="临时对象优化"><a href="#临时对象优化" class="headerlink" title="临时对象优化"></a>临时对象优化</h3><ul>
+<h3 id="临时对象泄漏"><a href="#临时对象泄漏" class="headerlink" title="临时对象泄漏"></a>临时对象泄漏</h3><ul>
 <li>排查思路:</li>
 </ul>
 <ol>
@@ -408,6 +396,24 @@
 </ol>
 <figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-keyword">var</span> buffPool10K = sync.Pool&#123;<br>	New: <span class="hljs-function"><span class="hljs-keyword">func</span><span class="hljs-params">()</span></span> <span class="hljs-keyword">interface</span>&#123;&#125; &#123; <span class="hljs-keyword">return</span> <span class="hljs-built_in">make</span>([]<span class="hljs-type">byte</span>, <span class="hljs-number">10240</span>) &#125;,<br>&#125;<br><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">GetBuffer</span><span class="hljs-params">()</span></span> *bytes.Buffer &#123;<br>	 <span class="hljs-keyword">return</span> buffPool10K.Get().(*bytes.Buffer)<br>&#125;<br><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">PutBuffer</span><span class="hljs-params">(buff *bytes.Buffer)</span></span> &#123;<br>	buff.Reset()<br>	buffPool10K.Put(buff)<br>&#125;<br></code></pre></td></tr></table></figure>
 
+
+<h4 id="永久性对象泄漏"><a href="#永久性对象泄漏" class="headerlink" title="永久性对象泄漏"></a>永久性对象泄漏</h4><p>排查思路:</p>
+<ol>
+<li><p>协程泄漏</p>
+<ol>
+<li><p>排查渠道: </p>
+<ol>
+<li>一般可以通过监控看到协程数暴涨 </li>
+<li>pprof heap的时候会看到 <code>runtime.malg</code> 调用量很多，这说明go创建了很多</li>
+</ol>
+</li>
+<li><p>查看goroutine堆栈信息</p>
+ <figure class="highlight apache"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><code class="hljs apache"><span class="hljs-comment"># debug=0:可以看到goroutine总数; 1: 可以看到goroutine堆栈信息(死锁问题也可以用)</span><br><span class="hljs-attribute">go</span> tool pprof -http=:<span class="hljs-number">8088</span> http://目标机器:端口/debug/pprof/groutine?debug=<span class="hljs-number">1</span><br></code></pre></td></tr></table></figure></li>
+</ol>
+</li>
+<li><p>http请求的响应，要么读完要么一定要Close,否则底层readloop协程会因为底层channel没收到退出信号一致阻塞导致协程泄漏。</p>
+</li>
+</ol>
 <h3 id="GC优化"><a href="#GC优化" class="headerlink" title="GC优化"></a>GC优化</h3><h4 id="为什么要GC优化"><a href="#为什么要GC优化" class="headerlink" title="为什么要GC优化?"></a>为什么要GC优化?</h4><ol>
 <li>服务耗时影响</li>
 </ol>
