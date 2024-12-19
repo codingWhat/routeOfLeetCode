@@ -16,16 +16,16 @@
   <meta name="author" content="codingWhat">
   <meta name="keywords" content="evanhan codingWhat 博客 韩伟的博客 系统设计 后端开发">
   
-    <meta name="description" content="本文来探讨下业务中错误使用sync.RWMutex的读锁重入导致的死锁问题。">
+    <meta name="description" content="本文来探讨下业务中错误使用sync.RWMutex的读锁而导致的死锁问题。">
 <meta property="og:type" content="article">
 <meta property="og:title" content="golang读锁导致的死锁问题分析">
 <meta property="og:url" content="http://codingwhat.github.io/2024/12/19/rwmutex-deadlock/index.html">
 <meta property="og:site_name" content="codingWhat Blog">
-<meta property="og:description" content="本文来探讨下业务中错误使用sync.RWMutex的读锁重入导致的死锁问题。">
+<meta property="og:description" content="本文来探讨下业务中错误使用sync.RWMutex的读锁而导致的死锁问题。">
 <meta property="og:locale" content="zh_CN">
 <meta property="og:image" content="http://codingwhat.github.io/images/avoid_rlock_reentrant.png">
 <meta property="article:published_time" content="2024-12-19T04:09:42.000Z">
-<meta property="article:modified_time" content="2024-12-19T11:21:03.217Z">
+<meta property="article:modified_time" content="2024-12-19T11:24:22.795Z">
 <meta property="article:author" content="codingWhat">
 <meta property="article:tag" content="evanhan codingWhat 博客 韩伟的博客 系统设计 后端开发">
 <meta name="twitter:card" content="summary_large_image">
@@ -251,7 +251,7 @@
       <span class="post-meta mr-2">
         <i class="iconfont icon-chart"></i>
         
-          814 字
+          813 字
         
       </span>
     
@@ -313,7 +313,7 @@
               <div class="markdown-body">
                 
                 <blockquote>
-<p>本文来探讨下业务中错误使用sync.RWMutex的读锁重入导致的死锁问题。</p>
+<p>本文来探讨下业务中错误使用sync.RWMutex的读锁而导致的死锁问题。</p>
 </blockquote>
 <span id="more"></span>
 
