@@ -27,7 +27,7 @@
 <meta property="og:image" content="http://codingwhat.github.io/images/gc_mutator.png">
 <meta property="og:image" content="http://codingwhat.github.io/images/memory_limit.png">
 <meta property="article:published_time" content="2024-12-18T08:01:01.000Z">
-<meta property="article:modified_time" content="2024-12-19T06:59:35.537Z">
+<meta property="article:modified_time" content="2024-12-19T07:07:07.811Z">
 <meta property="article:author" content="codingWhat">
 <meta property="article:tag" content="evanhan codingWhat 博客 韩伟的博客 系统设计 后端开发">
 <meta name="twitter:card" content="summary_large_image">
@@ -324,7 +324,7 @@
 <li>善用语言分析工具</li>
 </ul>
 <h1 id="优化思路？"><a href="#优化思路？" class="headerlink" title="优化思路？"></a>优化思路？</h1><p>内存优化的目标就是把<span style="color: red;">不合理的、冗余、低效</span>的内存使用逻辑变成<span style="color: green;">合理、紧凑、高效的</span></p>
-<p>而程序中使用到的内存不是在堆空间就是在栈空间，因此优化的核心就是这俩个内存段。<br>go提供了完整的工具链，帮助开发者定位内存问题，写出高质量代码。</p>
+<p>而程序中使用到的内存不是在堆空间就是在栈空间，因此优化的核心就是这俩个内存段。<br>go针对上述两种提供了完整的工具链，来帮助开发者定位和分析内存问题，最终写出高质量代码。</p>
 <ul>
 <li>栈空间，使用 <code>go build -gcflags=&quot;-m -l&quot; 包名&quot;</code> 分析内存逃逸</li>
 <li>堆空间，使用go自带的<code>pprof</code>分析程序堆内存使用情况。</li>
