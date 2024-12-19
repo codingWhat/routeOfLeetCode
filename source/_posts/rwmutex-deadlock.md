@@ -73,8 +73,8 @@ func (rw *RWMutex) Lock() {
 }
 ```
 释放写锁
-1. 虽然是Add rwmutexMaxReaders,其实是返回了等待读取的协程个数
-2. 按个唤醒等待的读锁协程
+1. 通过 加rwmutexMaxReaders, 巧妙获取读协程个数
+2. 挨个唤醒等待的读锁协程
 ```golang
 func (rw *RWMutex) Unlock() {
 	// 省略race检查
@@ -95,7 +95,8 @@ func (rw *RWMutex) Unlock() {
 ```
 
 获取读锁
-1. 若加1之后readerCount为负数，则说明已经上了写锁，只能休眠等待被唤醒; 否则直接返回上锁成功
+1. 加读锁，比较简单，知识统计读协程个数。
+2. 若加后readerCount为负数，则说明已经上了写锁，只能休眠等待被唤醒; 否则直接返回上锁成功
 ```golang
 
 func (rw *RWMutex) RLock() {
@@ -110,9 +111,9 @@ func (rw *RWMutex) RLock() {
 
 ```
 释放读锁
-1. 若加-1之后readerCount >=0，说明没有写锁，那就正常解锁就可以了。
-2. 若<0, 说明还有写锁，并且更新写锁时更新的readerWait
-3. 若变为0，则说明所有读锁都执行完了，则唤醒写协程
+1. 释放读锁，也简单仅加-1。之后readerCount >=0，说明没有写锁，那就正常解锁就可以了。
+2. 若<0, 说明还有写锁在等待
+3. 若readerWait变为0，则说明所有读锁都执行完了，则唤醒写协程，大于0说明还有其他读锁，直接退出。
 ```golang
 func (rw *RWMutex) RUnlock() {
 	// 省略race检查
