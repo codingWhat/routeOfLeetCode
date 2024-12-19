@@ -138,9 +138,7 @@ func runqgrab(pp *p // 受害者P, batch *[256]guintptr //施害者P的runq , ba
 - scavenge heap(清理内存)
 
 
-#### Go"抢占"逻辑
-基于协作、信号量的抢占逻辑都是一样的，都是由sysmon线程去完成，这里抽离出单独介绍。
-
+#### Sysmon抢占G
 实现逻辑:
 sysmon遍历所有P，针对(_Prunning 和 _Psyscall)状态的P, 如果发现同时满足以下条件就抢占
 1. 从上一次监控线程观察到 p对应的m处于系统调用/运行时间已经超过10ms，
@@ -148,7 +146,7 @@ sysmon遍历所有P，针对(_Prunning 和 _Psyscall)状态的P, 如果发现同
 3. 没有“无所事事”的 p; 这就意味着没有“找工 作”的 M，也没有空闲的 P，大家都在“忙”，可能有很多工作要做,因此要抢占当前的 P，让它来承担 一部分工作。
 4. `preemptone (_p_ *p)`方法中设置抢占标志位，`gp.stackguard0 = stackPreempt` 
 
-retake逻辑，重点并非"抢"，更多是指资源从一方转移到另一方。
+
 ```golang
 
 func retake(now int64) uint32 {
@@ -248,7 +246,7 @@ func preemptone(_p_ *p) bool {
 
 ```
 
-### handoff机制
+#### handoff机制
 当前发现正在执行的G发生阻塞、系统调用、或者需要被抢占时，P和M会解绑，会给P绑定"可用的"M,继续执行。而M会休眠，当调用结束之后，找一个空闲的P，若找不到P，M会变成休眠状态，进入空闲队列，G会被加入到全局`runq`
 
 ```golang
@@ -282,6 +280,10 @@ func handoffp(_p_ *p) {
 ```
 
 ### 基于协作的抢占式调度
+#### 触发时机
+- sysmon超时检测，触发抢占G
+
+
 #### 如何让goroutine主动让出CPU？
 
 实现思路：编译器会在每个函数插入一段检查是否栈扩容的逻辑(`runtime.morestack`)。
@@ -385,8 +387,8 @@ gopreempt_m(gp) // never return
 
 
 ### 基于信号量的抢占式调度
-
-实现原理：线程通过注册信号监听，sysmon定期发送信号
+#### 实现原理
+线程通过注册信号监听，sysmon定期发送信号
 信号机制，注册`runtime.sighandler`,接收到信号`SIGURG`时，由操作系统中断转入内核空间，而后将所中断线程的执行上下文参数(例如寄存器 rip、rep 等)传递给处理函数。如果在 runtime.sighandler 中修改了这个上下文参数，操作系统则会根据修 改后的上下文信息恢复执行
 
 抢占信号处理函数:
@@ -436,9 +438,9 @@ func asyncPreempt2() {
 
 ```
 
-#### 触发时机:
+#### 抢占触发时机
 - GC标记阶段
-- sysmon超时检测
+- sysmon超时检测，触发抢占G
 
 runtime/mgcmark.go
 ```golang
