@@ -388,8 +388,7 @@ gopreempt_m(gp) // never return
 
 ### 基于信号量的抢占式调度
 #### 实现原理
-线程通过注册信号监听，sysmon定期发送信号
-信号机制，注册`runtime.sighandler`,接收到信号`SIGURG`时，由操作系统中断转入内核空间，而后将所中断线程的执行上下文参数(例如寄存器 rip、rep 等)传递给处理函数。如果在 runtime.sighandler 中修改了这个上下文参数，操作系统则会根据修 改后的上下文信息恢复执行
+注册到统一的信号处理函数`runtime.sighandler`,接收到信号`SIGURG`时，转交给`doSigPreemt`抢占函数执行，由操作系统中断转入内核空间，而后将所中断线程的执行上下文参数(例如寄存器 rip、rep 等)传递给处理函数。如果在 runtime.sighandler 中修改了这个上下文参数，操作系统则会根据修 改后的上下文信息恢复执行
 
 抢占信号处理函数:
 ```golang
