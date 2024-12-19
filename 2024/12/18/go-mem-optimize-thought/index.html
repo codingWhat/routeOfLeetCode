@@ -16,18 +16,18 @@
   <meta name="author" content="codingWhat">
   <meta name="keywords" content="evanhan codingWhat 博客 韩伟的博客 系统设计 后端开发">
   
-    <meta name="description" content="内存优化是重要且庞大的话题，本文试着从软件编码、软件上线的这个脉络，将内存优化步骤去拆解成编码阶段和程序运行阶段，之后分别介绍不同阶段下的分析工具和常见case的解决方案，最后也推荐使用《Go 编码建议》，学习常见内存优化技巧，提升代码质量和性能。">
+    <meta name="description" content="本文假设读者了解Go内存空间、堆栈等概念，具备一定的go使用经验">
 <meta property="og:type" content="article">
 <meta property="og:title" content="go内存优化分析思路">
 <meta property="og:url" content="http://codingwhat.github.io/2024/12/18/go-mem-optimize-thought/index.html">
 <meta property="og:site_name" content="codingWhat Blog">
-<meta property="og:description" content="内存优化是重要且庞大的话题，本文试着从软件编码、软件上线的这个脉络，将内存优化步骤去拆解成编码阶段和程序运行阶段，之后分别介绍不同阶段下的分析工具和常见case的解决方案，最后也推荐使用《Go 编码建议》，学习常见内存优化技巧，提升代码质量和性能。">
+<meta property="og:description" content="本文假设读者了解Go内存空间、堆栈等概念，具备一定的go使用经验">
 <meta property="og:locale" content="zh_CN">
 <meta property="og:image" content="http://codingwhat.github.io/images/go_mem_escape.png">
 <meta property="og:image" content="http://codingwhat.github.io/images/gc_mutator.png">
 <meta property="og:image" content="http://codingwhat.github.io/images/memory_limit.png">
 <meta property="article:published_time" content="2024-12-18T08:01:01.000Z">
-<meta property="article:modified_time" content="2024-12-19T04:07:40.793Z">
+<meta property="article:modified_time" content="2024-12-19T06:55:35.682Z">
 <meta property="article:author" content="codingWhat">
 <meta property="article:tag" content="evanhan codingWhat 博客 韩伟的博客 系统设计 后端开发">
 <meta name="twitter:card" content="summary_large_image">
@@ -315,40 +315,33 @@
               <div class="markdown-body">
                 
                 <blockquote>
-<p>内存优化是重要且庞大的话题，本文试着从软件编码、软件上线的这个脉络，将内存优化步骤去拆解成编码阶段和程序运行阶段，之后分别介绍不同阶段下的分析工具和常见case的解决方案，最后也推荐使用《Go 编码建议》，学习常见内存优化技巧，提升代码质量和性能。</p>
+<p>本文假设读者了解Go内存空间、堆栈等概念，具备一定的go使用经验</p>
 </blockquote>
 <span id="more"></span>
 
-
-
 <h1 id="优化原则"><a href="#优化原则" class="headerlink" title="优化原则"></a>优化原则</h1><ul>
-<li>切勿过早优化</li>
+<li>切勿过早优化！！！！</li>
 <li>善用语言分析工具</li>
 </ul>
-<h1 id="优化思路"><a href="#优化思路" class="headerlink" title="优化思路"></a>优化思路</h1><ol>
-<li>优先分配到栈空间</li>
-<li>一次性申请空间</li>
-<li>复用空间</li>
-<li>减少指针?视情况而定<ol>
-<li>缺点: 指针会被编译器加入(&#x3D; nil panic逻辑，较值类型多判断逻辑)</li>
-<li>优点：减少内存拷贝; 而大struct值类型会牵扯内存拷贝</li>
-</ol>
-</li>
-</ol>
-<p><strong>内存优化本质就是对栈空间和堆空间的优化</strong></p>
-<h1 id="编码阶段-栈空间"><a href="#编码阶段-栈空间" class="headerlink" title="编码阶段-栈空间"></a>编码阶段-栈空间</h1><p>尽可能将局部变量被分配到栈空间，减轻GC的扫描压力，可以关注变量是否逃逸。</p>
-<h2 id="逃逸分析工具"><a href="#逃逸分析工具" class="headerlink" title="逃逸分析工具"></a>逃逸分析工具</h2><p>go在编译时通过<code>gcflags</code>分析特定包下所有函数变量的逃逸情况。</p>
+<h1 id="优化思路？"><a href="#优化思路？" class="headerlink" title="优化思路？"></a>优化思路？</h1><p>内存优化的目标就是把<span style="color: red;">不合理的、冗余、低效</span>的内存使用逻辑变成<span style="color: green;">合理、紧凑、高效的</span></p>
+<p>而程序中使用到的内存不是在堆空间就是在栈空间，因此优化的核心就是这俩个内存段。<br>go提供了完整的工具链，帮助开发者定位内存问题，写出高质量代码。</p>
+<ul>
+<li>栈空间，使用 <code>go build -gcflags=&quot;-m -l&quot; 包名&quot;</code> 分析内存逃逸</li>
+<li>堆空间，使用go自带的<code>pprof</code>分析程序堆内存使用情况。</li>
+</ul>
+<h1 id="栈空间"><a href="#栈空间" class="headerlink" title="栈空间"></a>栈空间</h1><p>优化思路： 尽可能将局部变量被分配到栈空间，减轻GC的扫描压力，减少逃逸的局部变量。</p>
+<h2 id="分析工具"><a href="#分析工具" class="headerlink" title="分析工具"></a>分析工具</h2><p>go在编译时通过<code>gcflags</code>分析特定包下所有函数变量的逃逸情况。</p>
 <figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><code class="hljs go"># -l 禁止编译器内联优化<br><span class="hljs-keyword">go</span> build -gcflags=<span class="hljs-string">&quot;-m -l&quot;</span>  <span class="hljs-keyword">package</span><br></code></pre></td></tr></table></figure>
 
-<h2 id="逃逸case"><a href="#逃逸case" class="headerlink" title="逃逸case"></a>逃逸case</h2><p>常见逃逸场景:</p>
-<ul>
-<li>函数外引用</li>
+<h2 id="内存逃逸说明"><a href="#内存逃逸说明" class="headerlink" title="内存逃逸说明"></a>内存逃逸说明</h2><h3 id="逃逸场景"><a href="#逃逸场景" class="headerlink" title="逃逸场景"></a>逃逸场景</h3><ul>
+<li>函数外引用, return </li>
 <li>局部变量太大</li>
 <li>指针类型</li>
 <li>接口类型，编译时无法确定大小，</li>
+<li>反射</li>
 </ul>
-<p>常见规避逃逸场景:</p>
-<ul>
+<h3 id="优化逃逸"><a href="#优化逃逸" class="headerlink" title="优化逃逸"></a>优化逃逸</h3><ul>
+<li>局部变量slice&#x2F;map，尽量在编译阶段确定大小</li>
 <li>字符串拼接，使用strings.Builder</li>
 <li>局部变量map&#x2F;slice，使用固定大小(非依赖外部参数场景)</li>
 <li>慎用 time.Format(). 底层中[]byte会逃逸，使用time.AppendFormat(使用已知大小的byte)</li>
@@ -358,20 +351,18 @@
 
 <p>执行：go build -gcflags “-m -l” main.go</p>
 <p><img src="/images/go_mem_escape.png" srcset="/img/loading.gif" lazyload alt="image.png"></p>
-<h1 id="运行阶段-堆空间"><a href="#运行阶段-堆空间" class="headerlink" title="运行阶段-堆空间"></a>运行阶段-堆空间</h1><h2 id="pprof"><a href="#pprof" class="headerlink" title="pprof"></a>pprof</h2><p>go提供了强大的性能分析工具pprof，通常生产环境会以服务的形式打开pprof, 可以通过以下命令分析。</p>
+<h1 id="堆空间"><a href="#堆空间" class="headerlink" title="堆空间"></a>堆空间</h1><h2 id="pprof"><a href="#pprof" class="headerlink" title="pprof"></a>pprof</h2><p>go提供了强大的性能分析工具pprof，通常生产环境会以服务的形式打开pprof, 可以通过以下命令分析。</p>
 <figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-keyword">go</span> tool pprof http:<span class="hljs-comment">//目标机器:端口/debug/pprof/heap?seconds=采集周期</span><br><br># 创建本地web服务，访问火焰图<br><span class="hljs-keyword">go</span> tool pprof -http=:<span class="hljs-number">8884</span> pprof文件 <br></code></pre></td></tr></table></figure>
 
 <p>上述两者也可以合并:</p>
 <figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-keyword">go</span> tool pprof -http=:<span class="hljs-number">8884</span>  http:<span class="hljs-comment">//目标机器:端口/debug/pprof/heap?seconds=采集周期</span><br></code></pre></td></tr></table></figure>
-<h2 id="常见问题以及其解决方案"><a href="#常见问题以及其解决方案" class="headerlink" title="常见问题以及其解决方案"></a>常见问题以及其解决方案</h2><p>分类:</p>
-<ol>
+<h2 id="问题分类"><a href="#问题分类" class="headerlink" title="问题分类"></a>问题分类</h2><ol>
 <li>内存泄漏</li>
 <li>GC-STW耗时</li>
 </ol>
-<h3 id="内存泄漏"><a href="#内存泄漏" class="headerlink" title="内存泄漏"></a>内存泄漏</h3><p>分类</p>
-<ol>
-<li>临时性内存泄漏 (大量临时对象，gc还没来的即清理，影响新对象的申请)</li>
-<li>永久性内存泄漏 (资源未关闭&#x2F;释放, 文件&#x2F;连接未关闭, 协程未释放)</li>
+<h3 id="内存泄漏"><a href="#内存泄漏" class="headerlink" title="内存泄漏"></a>内存泄漏</h3><ol>
+<li>临时性 (大量临时对象，gc还没来的即清理，影响新对象的申请)</li>
+<li>永久性 (资源未关闭&#x2F;释放, 文件&#x2F;连接未关闭, 协程未释放)</li>
 </ol>
 <h4 id="临时对象泄漏"><a href="#临时对象泄漏" class="headerlink" title="临时对象泄漏"></a>临时对象泄漏</h4><ul>
 <li>排查思路:</li>
@@ -388,7 +379,7 @@
 <li>常见解决方案:<ol>
 <li>一次性申请空间, 比如slice&#x2F;map, 初始化时传具体大小参数，规避扩容(rehash&#x2F;growslice)逻辑。</li>
 <li>使用单例模式。一般服务都是分层的，如service&#x2F;dao等，链路中会NewXXXService, 使用sync.Once避免创建大量临时对象。</li>
-<li>去除不必要的数据结构。一般读接口会涉及到组装数据，通常会用map存储映射数据方便定位，不过可以去除这个map，直接用slice索引定位数据，能省下大量的map临时对象。<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><code class="hljs sql">伪代码<br>func getComments(commentIds []<span class="hljs-type">int</span>) map[<span class="hljs-type">int</span>]commentInfo &#123;<br>     <br>     []commentsInfo  <span class="hljs-operator">&lt;=</span> comments:<span class="hljs-operator">=</span>  loadDataFromDB(commentIds)<br>    <br>     var map[<span class="hljs-type">int</span>]commentInfo <span class="hljs-operator">/</span><span class="hljs-operator">/</span>可以移除， 直接返回[]commentsInfo。外部组装时，直接用索引定位数据<br>     <span class="hljs-keyword">for</span> _, comm :<span class="hljs-operator">=</span><span class="hljs-keyword">range</span> comments &#123;<br>        ret map[comm.ID] <span class="hljs-operator">=</span> comm<br>     &#125;<br>    <span class="hljs-keyword">return</span> <br> &#125;<br></code></pre></td></tr></table></figure></li>
+<li>去除不必要的数据结构。一般读接口会涉及到组装数据，通常会用map存储映射数据方便定位，不过可以去除这个map，直接用slice索引定位数据，能省下大量的map临时对象。<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><code class="hljs go">伪代码<br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">getComments</span><span class="hljs-params">(commentIds []<span class="hljs-type">int</span>)</span></span> <span class="hljs-keyword">map</span>[<span class="hljs-type">int</span>]commentInfo &#123;<br>     <br>     []commentsInfo  &lt;= comments:=  loadDataFromDB(commentIds)<br>    <br>     <span class="hljs-keyword">var</span> <span class="hljs-keyword">map</span>[<span class="hljs-type">int</span>]commentInfo <span class="hljs-comment">//可以移除， 直接返回[]commentsInfo。外部组装时，直接用索引定位数据</span><br>     <span class="hljs-keyword">for</span> _, comm :=<span class="hljs-keyword">range</span> comments &#123;<br>        ret <span class="hljs-keyword">map</span>[comm.ID] = comm<br>     &#125;<br>    <span class="hljs-keyword">return</span> <br> &#125;<br></code></pre></td></tr></table></figure></li>
 </ol>
 </li>
 </ul>
@@ -517,6 +508,12 @@
                 <div class="post-prevnext my-3">
                   <article class="post-prev col-6">
                     
+                    
+                      <a href="/2024/12/19/rwmutex-deadlock/" title="golang读锁导致的死锁问题分析">
+                        <i class="iconfont icon-arrowleft"></i>
+                        <span class="hidden-mobile">golang读锁导致的死锁问题分析</span>
+                        <span class="visible-mobile">上一篇</span>
+                      </a>
                     
                   </article>
                   <article class="post-next col-6">
