@@ -26,7 +26,7 @@
 <meta property="og:image" content="http://codingwhat.github.io/images/go_mem_escape.png">
 <meta property="og:image" content="http://codingwhat.github.io/images/gc_mutator.png">
 <meta property="article:published_time" content="2024-12-18T08:01:01.000Z">
-<meta property="article:modified_time" content="2024-12-19T03:45:43.927Z">
+<meta property="article:modified_time" content="2024-12-19T03:49:03.214Z">
 <meta property="article:author" content="codingWhat">
 <meta property="article:tag" content="evanhan codingWhat 博客 韩伟的博客 系统设计 后端开发">
 <meta name="twitter:card" content="summary_large_image">
@@ -328,7 +328,11 @@
 <li>优先分配到栈空间</li>
 <li>一次性申请空间</li>
 <li>复用空间</li>
-<li>减少指针?视情况而定。缺点: 指针会被编译器加入(&#x3D; nil panic逻辑，较值类型多判断逻辑), 优点： 减少内存拷贝;大struct值类型会牵扯内存拷贝</li>
+<li>减少指针?视情况而定<ol>
+<li>缺点: 指针会被编译器加入(&#x3D; nil panic逻辑，较值类型多判断逻辑)</li>
+<li>优点：减少内存拷贝; 而大struct值类型会牵扯内存拷贝</li>
+</ol>
+</li>
 </ol>
 <p><strong>内存优化本质就是对栈空间和堆空间的优化</strong></p>
 <h1 id="编码阶段-栈空间"><a href="#编码阶段-栈空间" class="headerlink" title="编码阶段-栈空间"></a>编码阶段-栈空间</h1><p>尽可能将局部变量被分配到栈空间，减轻GC的扫描压力</p>
@@ -351,8 +355,8 @@
 <li>慎用 time.Format(). 底层中[]byte会逃逸，使用time.AppendFormat(使用已知大小的byte)</li>
 </ul>
 <p>模拟标准库<code>time.Now.Format</code>为例</p>
-<pre><code class="hljs"><figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">Format</span><span class="hljs-params">(layout <span class="hljs-type">string</span>)</span></span> <span class="hljs-type">string</span> &#123;<br>    <span class="hljs-keyword">const</span> bufSize = <span class="hljs-number">64</span><br>    <span class="hljs-keyword">var</span> b []<span class="hljs-type">byte</span><br>    max := <span class="hljs-built_in">len</span>(layout) + <span class="hljs-number">10</span><br>    <span class="hljs-keyword">if</span> max &lt; bufSize &#123;<br>        <span class="hljs-keyword">var</span> buf [bufSize]<span class="hljs-type">byte</span><br>        b = buf[:<span class="hljs-number">0</span>]<br>    &#125; <span class="hljs-keyword">else</span> &#123;<br>        b = <span class="hljs-built_in">make</span>([]<span class="hljs-type">byte</span>, <span class="hljs-number">0</span>, max)<br>    &#125;<br>    b = AppendFormat(b, layout) <span class="hljs-comment">//这里简化，只为了说明buf内存逃逸</span><br>    <span class="hljs-keyword">return</span> <span class="hljs-type">string</span>(b)<br>&#125;<br><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">AppendFormat</span><span class="hljs-params">(b []<span class="hljs-type">byte</span>, c <span class="hljs-type">string</span>)</span></span> []<span class="hljs-type">byte</span> &#123;<br>    <span class="hljs-keyword">return</span> []<span class="hljs-type">byte</span>&#123;&#125;<br>&#125;<br></code></pre></td></tr></table></figure>
-</code></pre>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><code class="hljs go"><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">Format</span><span class="hljs-params">(layout <span class="hljs-type">string</span>)</span></span> <span class="hljs-type">string</span> &#123;<br>    <span class="hljs-keyword">const</span> bufSize = <span class="hljs-number">64</span><br>    <span class="hljs-keyword">var</span> b []<span class="hljs-type">byte</span><br>    max := <span class="hljs-built_in">len</span>(layout) + <span class="hljs-number">10</span><br>    <span class="hljs-keyword">if</span> max &lt; bufSize &#123;<br>        <span class="hljs-keyword">var</span> buf [bufSize]<span class="hljs-type">byte</span><br>        b = buf[:<span class="hljs-number">0</span>]<br>    &#125; <span class="hljs-keyword">else</span> &#123;<br>        b = <span class="hljs-built_in">make</span>([]<span class="hljs-type">byte</span>, <span class="hljs-number">0</span>, max)<br>    &#125;<br>    b = AppendFormat(b, layout) <span class="hljs-comment">//这里简化，只为了说明buf内存逃逸</span><br>    <span class="hljs-keyword">return</span> <span class="hljs-type">string</span>(b)<br>&#125;<br><br><span class="hljs-function"><span class="hljs-keyword">func</span> <span class="hljs-title">AppendFormat</span><span class="hljs-params">(b []<span class="hljs-type">byte</span>, c <span class="hljs-type">string</span>)</span></span> []<span class="hljs-type">byte</span> &#123;<br>    <span class="hljs-keyword">return</span> []<span class="hljs-type">byte</span>&#123;&#125;<br>&#125;<br></code></pre></td></tr></table></figure>
+
 <p>执行：go build -gcflags “-m -l” main.go</p>
 <p><img src="/images/go_mem_escape.png" srcset="/img/loading.gif" lazyload alt="image.png"></p>
 <h1 id="运行阶段-堆空间"><a href="#运行阶段-堆空间" class="headerlink" title="运行阶段-堆空间"></a>运行阶段-堆空间</h1><h2 id="pprof"><a href="#pprof" class="headerlink" title="pprof"></a>pprof</h2><p>go提供了强大的性能分析工具pprof，通常生产环境会以服务的形式打开pprof, 可以通过以下命令分析。</p>
