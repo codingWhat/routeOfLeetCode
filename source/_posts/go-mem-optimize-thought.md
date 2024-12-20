@@ -96,21 +96,22 @@ go tool pprof -http=:8884  http://目标机器:端口/debug/pprof/heap?seconds=�
 1. 临时性 (大量临时对象，gc还没来的即清理，影响新对象的申请)
 2. 永久性 (资源未关闭/释放, 文件/连接未关闭, 协程未释放)
 
+
 #### 临时对象泄漏
 
-- 排查思路:
-1. 通过prrof对cpu Profile 查看内存申请的调用占比.
+排查思路:
+1. pprof heap alloc_space 程序内存分配情况。(临时对象的优化)
+    ```golang
+        go tool pprof -alloc_space -http=:8088 http://目标机器:端口/debug/pprof/heap?debug=1&seconds=采集周期
+    ```
+
+常见case:
+1. 一次性申请空间, 比如slice/map, 初始化时传具体大小参数，规避扩容(rehash/growslice)逻辑。
+2. 使用单例模式。一般服务都是分层的，如service/dao等，链路中会NewXXXService, 使用sync.Once避免创建大量临时对象。
+3. 去除不必要的数据结构。一般读接口会涉及到组装数据，通常会用map存储映射数据方便定位，不过可以去除这个map，直接用slice索引定位数据，能省下大量的map临时对象。
 
 ```go
-go tool pprof -http=:8883 http://目标机器:端口/debug/pprof/profile?seconds=采集周期
-```
 
-2. 提取**核心链路**中调用mallocgc的方法
-- 常见解决方案:
-    1. 一次性申请空间, 比如slice/map, 初始化时传具体大小参数，规避扩容(rehash/growslice)逻辑。
-    2. 使用单例模式。一般服务都是分层的，如service/dao等，链路中会NewXXXService, 使用sync.Once避免创建大量临时对象。
-    3. 去除不必要的数据结构。一般读接口会涉及到组装数据，通常会用map存储映射数据方便定位，不过可以去除这个map，直接用slice索引定位数据，能省下大量的map临时对象。
-```go
 伪代码
 func getComments(commentIds []int) map[int]commentInfo {
      
@@ -142,19 +143,50 @@ func PutBuffer(buff *bytes.Buffer) {
 
 
 #### 永久性对象泄漏
+
 排查思路:
-1. 协程泄漏
-
-    1. 排查渠道: 
-       1. 一般可以通过监控看到协程数暴涨 
-       2. pprof heap的时候会看到 `runtime.malg` 调用量很多，这说明go创建了很多
-
-    2. 查看goroutine堆栈信息
-        ```
-        # debug=0:可以看到goroutine总数; 1: 可以看到goroutine堆栈信息(死锁问题也可以用)
-        go tool pprof -http=:8088 http://目标机器:端口/debug/pprof/groutine?debug=1
-        ```
- 2. http请求的响应，要么读完要么一定要Close,否则底层readloop协程会因为底层channel没收到退出信号一致阻塞导致协程泄漏。
+1. 检查监控指标, 确认内存是持续增长，优先查看是否是协程泄漏。
+2. pprof heap inuse_space 程序常驻内存占用情况。(需要重点关注，结合拓扑图定位内存泄漏的源头)
+    ```golang
+        go tool pprof -inuse_space -http=:8088 http://目标机器:端口/debug/pprof/heap?debug=1
+    ```
+   
+泄漏case:
+1. 协程泄漏。监控指标(协程数、内存)持续增长，pprof profile的`runtime.malg`增长较高
+    ```
+    # debug=0:可以看到goroutine总数; 1: 可以看到活跃goroutine堆栈信息，分析定位问题(如死锁或资源竞争)
+    go tool pprof -http=:8088 http://目标机器:端口/debug/pprof/groutine?debug=1
+    ```
+2. 连接未关闭。http请求的响应，要么读完要么一定要Close,否则底层readloop协程会因为底层channel没收到退出信号一致阻塞导致协程泄漏。
+3. <font color="red">警惕conn、client、db、mysql rows、mysql statment </font>
+```golang
+func Mysql() {
+    db, err := sql.Open("driver-name", "database=dsn")
+    if err != nil {
+     log.Fatal(err)
+    }
+    defer db.Close() //数据库关闭!!!!!
+    
+    stmt, err := db.Prepare("SELECT * FROM users WHERE age > ?")
+    if err != nil {
+      log.Fatal(err)
+    }
+    defer stmt.Close() // Statement关闭!!!!! 确保在不再需要 statement 时关闭它
+    
+    rows, err := stmt.Query(18)
+    if err != nil {
+     log.Fatal(err)
+    }
+    defer rows.Close() // Rows关闭!!!! 确保在读取完数据后关闭 rows
+    
+    for rows.Next() {
+        // 处理每一行数据
+    }
+    if err = rows.Err(); err != nil {
+     log.Fatal(err)
+    }
+}
+```
 
 ### GC优化
 
@@ -173,16 +205,16 @@ GC并发扫描完之后会有STW，此时其他goroutine都是休眠的状态，
 
 - 主动执行
 
-```go
-runtime.GC()
-```
+    ```go
+    runtime.GC()
+    ```
 
 - sysmon线程定期执行
 
-```go
-# 计算下次GC的内存阈值
-NextGC = live data + GCPercent * live data
-```
+    ```go
+    # 计算下次GC的内存阈值
+    NextGC = live data + GCPercent * live data
+    ```
 
 - 申请内存时执行, mallocgc
 
