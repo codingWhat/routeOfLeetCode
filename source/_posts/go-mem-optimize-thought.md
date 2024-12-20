@@ -41,9 +41,8 @@ go build -gcflags="-m -l"  package
 - 反射
 
 ## 常见逃逸优化
-- 局部变量slice/map，尽量在编译阶段确定大小
+- 局部变量slice/map，尽量在编译阶段确定大小(非依赖外部参数场景)
 - 字符串拼接，使用strings.Builder
-- 局部变量map/slice，使用固定大小(非依赖外部参数场景)
 - 慎用 time.Format(). 底层中[]byte会逃逸，使用time.AppendFormat(使用已知大小的byte)
 
 模拟标准库`time.Now.Format`为例
@@ -205,7 +204,7 @@ go tool trace -http=127.0.0.1:8129 trace.out
 通过trace可以得知以下信息:
 
 - GC频率，看是否太过频繁
-- **Minimum mutator utilization**， mutator使用率越接近100%，GC影响越少
+- **Minimum mutator utilization**， mutator使用率越接近100%，说明CPU大部分时间都是程序在跑。
   ![mutator使用率](/images/gc_mutator.png)
 
 tips:

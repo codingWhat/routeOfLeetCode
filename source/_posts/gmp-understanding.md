@@ -139,13 +139,16 @@ func runqgrab(pp *p // 受害者P, batch *[256]guintptr //施害者P的runq , ba
 
 
 #### Sysmon抢占G
-实现逻辑:
-sysmon遍历所有P，针对(_Prunning 和 _Psyscall)状态的P, 如果发现同时满足以下条件就抢占
+
+##### 抢占条件
+sysmon遍历所有P，针对(`_Prunning` 和 `_Psyscall`)状态的P, 如果发现同时满足以下条件就抢占
 1. 从上一次监控线程观察到 p对应的m处于系统调用/运行时间已经超过10ms，
 2. p的运行队列里面有等待运行的goroutine
 3. 没有“无所事事”的 p; 这就意味着没有“找工 作”的 M，也没有空闲的 P，大家都在“忙”，可能有很多工作要做,因此要抢占当前的 P，让它来承担 一部分工作。
-4. `preemptone (_p_ *p)`方法中设置抢占标志位，`gp.stackguard0 = stackPreempt` 
 
+##### 抢占逻辑
+1. 设置协程抢占标记，在`preemptone (_p_ *p)`方法中设置抢占标志位，`gp.stackguard0 = stackPreempt` 
+2. 对处于`_Psyscall`的P还会执行`handoff`。
 
 ```golang
 
