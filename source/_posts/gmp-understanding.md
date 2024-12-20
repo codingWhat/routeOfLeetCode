@@ -433,7 +433,7 @@ func asyncPreempt2() {
     mcall(preemptPark)  //mcall switches from the g to the g0 stack and invokes `preemptPark`,
 	    // parks gp and puts it in _Gpreempted.
     } else {
-    mcall(gopreempt_m) // 将上下文中的G写入调度队列中，等待被调度
+    mcall(gopreempt_m) // 将上下文中的G写入调度队列改成Runnable状态。`casgstatus(gp, _Grunning, _Grunnable)`，再次执行schedule()开始重新调度
     }
     gp.asyncSafePoint = false
 }
